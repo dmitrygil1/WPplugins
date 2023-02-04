@@ -1149,86 +1149,6 @@ jQuery(document).ready(function($){
 
     });
 
-    // "Copy 2 clipboard" universal feature:
-    function leyka_copy_text2clipboard(text2copy) {
-
-        let $copy_buffer_input = $('<input>').appendTo('body');
-
-        $copy_buffer_input.val(text2copy).select();
-        document.execCommand('copy');
-        $copy_buffer_input.remove();
-
-    }
-
-    function leyka_add_copy_controls($text2copy_container) {
-
-        let $copy_link = $('<span>');
-        $copy_link
-            .addClass('copy-control')
-            .addClass('copy-link')
-            .text(leyka.copy2clipboard_text)
-            .appendTo($text2copy_container);
-
-        let $copy_done = $('<span>');
-        $copy_done
-            .addClass('copy-control')
-            .addClass('copy-done')
-            .text(leyka.copied2clipboard_text)
-            .appendTo($text2copy_container);
-
-    }
-
-    function leyka_collect_text2copy($copy_link) {
-
-        let $wrapper = $copy_link.parents('.leyka-copy-on-click'),
-            $text = $wrapper.find('.copy-content');
-
-        if($text.length) {
-            return $.trim($text.text());
-        }
-
-        $wrapper = $wrapper.clone();
-        $wrapper.find('.copy-link, .copy-done').remove();
-
-        let $inner_control = $wrapper.find('input[type="text"], input[type="color"], input[type="date"], input[type="datetime-local"], input[type="month"], input[type="email"], input[type="number"], input[type="search"], input[type="range"], input[type="search"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea');
-
-        return $.trim($inner_control.length ? $inner_control.val() : $wrapper.text());
-
-    }
-
-    $('.leyka-copy-on-click').each(function(){
-
-        let $wrapper = $(this),
-            tmp_content = $wrapper.text();
-
-        $wrapper.text('').append('&nbsp;<span class="copy-content">' + tmp_content + '</span>');
-
-        leyka_add_copy_controls($wrapper);
-
-    });
-
-    $('.copy-link').on('click.leyka', function(e){
-
-        e.preventDefault();
-
-        let $copy_link = $(this);
-
-        leyka_copy_text2clipboard(leyka_collect_text2copy($copy_link));
-
-        $copy_link.fadeOut(function(){
-
-            $copy_link.siblings('.copy-done').show();
-
-            setTimeout(function(){
-                $copy_link.siblings('.copy-done').hide();
-                $copy_link.show();
-            }, 2000);
-
-        });
-
-    });
-    // "Copy 2 clipboard" universal feature - END
-
     // Delete fields comments:
     // $('.leyka-admin .leyka-options-section .field-component.help').contents().filter(function(){
     //     return this.nodeType === 1 || this.nodeType === 3; // 1 is for links, 3 - for plain text
@@ -1344,7 +1264,6 @@ jQuery(document).ready(function($){
                     classes: {
                         'ui-tooltip':
                             ($tooltip_element.hasClass('leyka-tooltip-wide') ? 'leyka-tooltip-wide' : '')+' '
-                            +($tooltip_element.hasClass('leyka-tooltip-x-wide') ? 'leyka-tooltip-x-wide' : '')+' '
                             +($tooltip_element.hasClass('leyka-tooltip-white') ? 'leyka-tooltip-white' : '')+' '
                             +($tooltip_element.hasClass('leyka-tooltip-align-left') ? 'leyka-tooltip-align-left' : '')+' '
                             +$tooltip_element.data('tooltip-additional-classes')
@@ -1353,8 +1272,6 @@ jQuery(document).ready(function($){
 
                         let $element = $(this),
                             tooltip_content = $element.siblings('.leyka-tooltip-content:first').html();
-
-                        // console.log(this, 'Inner tooltip content:', $element.siblings('.leyka-tooltip-content:first'))
 
                         return tooltip_content ? tooltip_content : $element.prop('title');
 
@@ -1372,7 +1289,7 @@ jQuery(document).ready(function($){
         }
     });
 
-    if($tooltips.length && typeof $().tooltip !== 'undefined') {
+    if($tooltips.length && typeof $().tooltip !== 'undefined' ) {
 
         // Init all tooltips on initial page rendering:
         $tooltips.each(function(i, element){
@@ -1385,14 +1302,14 @@ jQuery(document).ready(function($){
         $tooltips_on_click.on('click.leyka', function(){ // Tooltips on click - open
 
             let $element = $(this);
-            // if($element.hasClass('leyka-tooltip-on-click')) {
+            if($element.hasClass('leyka-tooltip-on-click')) {
 
-            if($element.hasClass('tooltip-opened')) { // Tootips on click - hide
-                $element.leyka_admin_tooltip('close').removeClass('tooltip-opened');
-            } else {
-                $element.addClass('tooltip-opened').leyka_admin_tooltip('open'); //.mouseenter();
+                if($element.hasClass('tooltip-opened')) { // Tootips on click - hide
+                    $element.leyka_admin_tooltip('close').removeClass('tooltip-opened');
+                } else {
+                    $element.addClass('tooltip-opened').leyka_admin_tooltip('open'); //.mouseenter();
+                }
             }
-            // }
 
         }).on('mouseout.leyka', function(e){ // Prevent mouseout and other related events from firing their handlers
             e.stopImmediatePropagation();
@@ -1415,26 +1332,6 @@ jQuery(document).ready(function($){
         // Tooltips on click - END
 
     }
-
-    // "Hidden" tooltips on click:
-    // if(typeof $().tooltip !== 'undefined') {
-    //     $body.on('click.leyka', '.has-tooltip.leyka-tooltip-on-click.leyka-inner-tooltip', function(e){
-    //
-    //         e.preventDefault();
-    //         e.stopImmediatePropagation();
-    //
-    //         let $element = $(this);
-    //         // console.log('HERE:', this, $element.siblings('.leyka-tooltip-content'))
-    //
-    //         $element.leyka_admin_tooltip({
-    //             content: $element.siblings('.leyka-tooltip-content:first').html()
-    //         });
-    //         $element.addClass('tooltip-opened').leyka_admin_tooltip('open');
-    //
-    //     });
-    // }
-    // "Hidden" tooltips on click - END
-
     // Tooltips - END
 
     // Multi-valued item complex fields:
@@ -1540,7 +1437,7 @@ jQuery(document).ready(function($){
             }
 
             // Generate & set the new item ID:
-            let new_item_id = leyka_get_random_string(4);
+            let new_item_id = '';
             do {
                 new_item_id = leyka_get_random_string(4);
             } while($items_wrapper.find('#item-'+new_item_id).length);
@@ -1552,29 +1449,11 @@ jQuery(document).ready(function($){
                 .prop('id', 'item-'+new_item_id)
                 .show();
 
-            const template_item_id = $item_template.prop('id').replace('item-', '');
-
             if($items_wrapper.find('#item-'+new_item_id)) {
 
                 $items_wrapper.sortable('option', 'update')();
 
                 const $new_item = $('#item-'+new_item_id);
-
-                $.each($new_item.find('*'), function(key, new_item_child_element){
-
-                    $(new_item_child_element).prop(
-                        'id',
-                        $(new_item_child_element).prop('id').replace(template_item_id, new_item_id)
-                    );
-
-                    if($(new_item_child_element).prop('name')) {
-                        $(new_item_child_element).prop(
-                            'name',
-                            $(new_item_child_element).prop('name').replace(template_item_id, new_item_id)
-                        );
-                    }
-
-                });
 
                 if($new_item && $new_item.hasClass('payment-amount-option')) {
 
@@ -1784,80 +1663,6 @@ jQuery(document).ready(function($){
 
     }).change();
 
-    $('.leyka-tab-title').on('click', function () {
-
-        $(this).parents('.leyka-tabs-titles').find('.leyka-tab-title').removeClass('leyka-active');
-        $(this).addClass('leyka-active');
-
-        $(this).parents('.leyka-tabs').find('.leyka-tab-content').addClass('leyka-hidden');
-
-        const tab_content_id = $(this).attr('id').replace('tab', 'wrapper');
-
-        $('#'+tab_content_id).parents('.leyka-tab-content').removeClass('leyka-hidden');
-
-    });
-
-    $('#payments_options .section-tab-nav-item[data-target="rates"]').on('click', () => {
-
-        $.get(leyka.ajaxurl, {
-            action: 'leyka_get_currencies_rates'
-        }, function(resp){
-
-            const currencies = JSON.parse(resp);
-
-            let main_currency = '';
-
-            for(let id in currencies) {
-                if(currencies[id] == '1') {
-
-                    main_currency = id;
-                    break;
-
-                }
-            }
-
-            const $currencies_elements_section = $('#payments_options .tab-rates .tab-section-options:nth-child(2)');
-
-            $currencies_elements_section.html('');
-
-            const main_currency_label = main_currency.toUpperCase();
-
-            for(let id in currencies) {
-
-                if(id === main_currency) {
-                    continue;
-                }
-
-                let currency_val = currencies[id],
-                    currency_label = id.toUpperCase();
-
-                $currencies_elements_section.append(`
-                    <div id="leyka_currency_${id}_exchange_rate-wrapper" 
-                        class="leyka-field-inner-wrapper leyka-number-field-wrapper" 
-                        data-field-title="${main_currency_label}-${currency_label}}">
-                        <label>
-                            <span class="field-component title">
-                                <span class="text">${main_currency_label}-${currency_label}</span>
-                                <span class="required">*</span>                                
-                                <span class="field-q">
-                                    <img src="/wp-content/plugins/leyka/img/icon-q.svg" alt="">
-                                    <span class="field-q-tooltip">${main_currency_label} to ${currency_label} exchange rate.</span>
-                                </span>
-                            </span>
-                            <span class="field-component field">
-                                <input type="number" id="leyka_currency_${id}_exchange_rate-field" name="leyka_currency_${id}_exchange_rate"
-                                       value="${currency_val}" placeholder="Enter rate value (e.g., 70)" maxLength="9" min="0" step="0.000000001">
-                            </span>
-                        </label>
-                    </div>
-                `);
-
-            }
-
-        });
-
-    });
-
 });
 /** Admin utilities & tools */
 
@@ -2003,250 +1808,6 @@ function lcfirst(str) {
 /** * @return boolean True if current page is in Gutenberg mode, false otherwise */
 function leyka_is_gutenberg_active() {
     return document.body.classList.contains('block-editor-page');
-}
-
-// Upgrade for JSON.stringify to allow arrays (used by LeykaLocalStorage class)
-(function(){
-
-    const convArrToObj = function(array){
-
-        let thisEleObj = new Object();
-
-        if(typeof array == "object"){
-            for(var i in array){
-
-                var thisEle = convArrToObj(array[i]);
-                thisEleObj[i] = thisEle;
-
-            }
-        }else {
-            thisEleObj = array;
-        }
-
-        return thisEleObj;
-
-    };
-
-    let oldJSONStringify = JSON.stringify;
-
-    JSON.stringify = function(input){
-        if(oldJSONStringify(input) == '[]')
-            return oldJSONStringify(convArrToObj(input));
-        else
-            return oldJSONStringify(input);
-    };
-
-})();
-
-function leyka_equlize_elements_width(elements_selector) {
-
-    const max_width = Math.max.apply(null, jQuery.map(
-        jQuery(elements_selector),
-        ($_element) => { return Math.ceil(parseFloat(jQuery($_element).css('width'))); })
-    );
-
-    jQuery(elements_selector).each((element_idx, $element) => {
-        jQuery($element).css('width', max_width);
-    })
-}
-
-/**
- * Class to handle LocalStorage
- */
-class LeykaLocalStorage {
-
-    static get(key) {
-        return localStorage.getItem('leyka-' + key);
-    }
-
-    static set(key, value) {
-        localStorage.setItem('leyka-' + key, value);
-    }
-
-    static remove(key) {
-        localStorage.removeItem('leyka-' + key);
-    }
-
-}
-
-/**
- * Class to handle stored states of the DOM elements (currently only visibility)
- */
-class LeykaStateControl {
-
-    static state_hidden = 'hidden';
-    static state_visible = 'visible';
-    static class_hidden = 'leyka-hidden';
-    static class_closed = 'leyka-closed';
-    static class_v_c_button = 'leyka-visibility-control-button'; // "v_c" => "visibility_control"
-    static data_attribute_v_c_button_targed = 'visibility-control-target';
-
-    static storeElementVisibilityState(selector, state) {
-
-        let elements_visibility = JSON.parse(LeykaLocalStorage.get('elements-visibility')) ? JSON.parse(LeykaLocalStorage.get('elements-visibility')) : [] ;
-
-        elements_visibility[selector] = state;
-
-        LeykaLocalStorage.set('elements-visibility', JSON.stringify(elements_visibility));
-
-    }
-
-    /**
-     * Hide element
-     * @param selector
-     * @return {boolean}
-     */
-    static hideElement(selector) {
-
-        let $element = jQuery(selector);
-
-        if($element.length === 0) {
-            return false;
-        }
-
-        $element.addClass(this.class_hidden);
-        jQuery('.'+this.class_v_c_button+'[data-'+this.data_attribute_v_c_button_targed+'="'+selector+'"]').addClass(this.class_closed);
-
-        this.storeElementVisibilityState(selector, this.state_hidden);
-
-        return true;
-
-    }
-
-    /**
-     * Show element
-     * @param selector
-     * @return {boolean}
-     */
-    static showElement(selector) {
-
-        let $element = jQuery(selector);
-
-        if($element.length === 0) {
-            return false;
-        }
-
-        $element.removeClass(this.class_hidden);
-        jQuery('.'+this.class_v_c_button+'[data-'+this.data_attribute_v_c_button_targed+'="'+selector+'"]').removeClass(this.class_closed);
-
-        this.storeElementVisibilityState(selector, this.state_visible);
-
-        return true;
-
-    }
-
-    /**
-     * Toggle element visibility
-     * @param selector
-     * @return {boolean}
-     */
-    static toggleElementVisibility(selector) {
-
-        let $element = jQuery(selector);
-
-        if($element.length === 0) {
-            return false;
-        }
-
-        if(this.getElementVisibility(selector) === this.state_visible) {
-            this.hideElement(selector);
-        } else if(this.getElementVisibility(selector) === this.state_hidden) {
-            this.showElement(selector);
-        }
-
-        return true;
-
-    }
-
-    /**
-     * Get stored visibility state
-     * @param selector
-     * @return {boolean|string}
-     */
-    static getElementVisibility(selector) {
-
-        const $element = jQuery(selector);
-
-        if($element.length === 0) {
-            return false;
-        }
-
-        let elements_visibility = JSON.parse(LeykaLocalStorage.get('elements-visibility')) ? JSON.parse(LeykaLocalStorage.get('elements-visibility')) : [] ;
-
-        if(elements_visibility[selector] == null) {
-
-            elements_visibility[selector] = jQuery($element).hasClass(this.class_hidden) ? this.state_hidden : this.state_visible;
-
-            this.storeElementVisibilityState(selector, elements_visibility[selector]);
-
-        }
-
-        return elements_visibility[selector];
-
-    }
-
-    /**
-     * Apply stored visibility state to the array of elements
-     * @param selectors Array of selectors
-     * @return {boolean|*[]}
-     */
-    static applyElementsVisibility(selectors) {
-
-        if( !Array.isArray(selectors) ) {
-            return false;
-        }
-
-        let result = [];
-
-        selectors.forEach((selector) => {
-
-            let $element = jQuery(selector);
-
-            if($element.length === 0) {
-                return false;
-            }
-
-            result[selector] = this.getElementVisibility(selector);
-
-            if(result[selector] === this.state_visible) {
-                $element.removeClass(this.class_hidden);
-                jQuery('.'+this.class_v_c_button+'[data-'+this.data_attribute_v_c_button_targed+'="'+selector+'"]').removeClass(this.class_closed);
-            } else if(result[selector] === this.state_hidden){
-                $element.addClass(this.class_hidden);
-                jQuery('.'+this.class_v_c_button+'[data-'+this.data_attribute_v_c_button_targed+'="'+selector+'"]').addClass(this.class_closed);
-            }
-
-        }, this);
-
-        return result;
-
-    }
-
-    /**
-     * Bind visibility control event to all buttons on the page with the sufficient class and apply visibility states
-     */
-    static initVisibilityControlButtons() {
-
-        const $buttons = jQuery('.'+this.class_v_c_button);
-        let targets_selectors = [];
-
-        $buttons.each((idx, $button) => {
-
-            const target_selector = jQuery($button).data(this.data_attribute_v_c_button_targed);
-
-            targets_selectors.push(target_selector);
-
-            jQuery($button).off('click.LeykaStateControl');
-            jQuery($button).on('click.LeykaStateControl', () => {
-                this.toggleElementVisibility(target_selector);
-            })
-
-        }, this);
-
-        this.applyElementsVisibility(targets_selectors);
-
-    }
-
 }
 /** Additional donation form fields settings JS */
 
@@ -2665,7 +2226,7 @@ jQuery(document).ready(function($){
                     className: 'column-donor',
                     render: function(donor, type, row_data){
                         return '<div class="donor-name">'
-                            +(donor.id ? '<a href="'+leyka.admin_url+'admin.php?page=leyka_donor_info&donor='+donor.id+'">' : '')
+                            +(donor.id ? '<a href="'+leyka.admin_url+'?page=leyka_donor_info&donor='+donor.id+'">' : '')
                             +donor.name
                             +(donor.id ? '</a>' : '')
                         +'</div>'
@@ -3132,9 +2693,7 @@ jQuery(document).ready(function($){
     $('.cron-setup-howto').on('click.leyka', function(e){
         e.preventDefault();
         $('#how-to-setup-cron').dialog('open');
-    });
-
-    leyka_equlize_elements_width('.portlet-stats-recurring .portlet-row.subscriptions .portlet-column');
+    })
 
 });
 
@@ -3197,7 +2756,6 @@ jQuery(document).ready(function($){
 
 // banner
 jQuery(document).ready(function($){
-
     $('.banner-wrapper .close').on('click.leyka', function(e){
 
         e.preventDefault();
@@ -3216,26 +2774,6 @@ jQuery(document).ready(function($){
         );
 
     });
-
-    $('.plugin-data-interval-label').on('click', () => {
-        $('.plugin-data-interval-label')
-            .toggleClass('leyka-closed')
-            .next('.leyka-content-wrapper').toggleClass('leyka-hidden');
-    });
-
-    $('body').on('click.leyka', (e) => {
-        if( $('.plugin-data-interval').has($(e.target)).length === 0 ) {
-
-            $('.plugin-data-interval-label').addClass('leyka-closed');
-            $('.plugin-data-interval-content .leyka-content-wrapper').addClass('leyka-hidden');
-
-        }
-    });
-
-    $('.leyka-admin-page-notice .leyka-close-button').on('click', () => {
-        $('.leyka-admin-page-notice').addClass('leyka-hidden');
-    });
-
 });
 
 /** Admin JS - Donation adding/editing pages **/
@@ -3415,7 +2953,122 @@ jQuery(document).ready(function($){
 
     });
 
-    LeykaStateControl.initVisibilityControlButtons();
+    // Recurring subscriptions Donations list data table:
+    let $data_table = $('.leyka-data-table.recurring-subscription-donations-table');
+
+    if($data_table.length && typeof $().DataTable !== 'undefined' && typeof leyka_dt !== 'undefined') {
+
+        $data_table.DataTable({
+
+            ordering:  false, /** @todo Add ordering to the table & it's AJAX query */
+            searching: false,
+            processing: true,
+            serverSide: true,
+
+            ajax: {
+                url: leyka.ajaxurl,
+                type: 'POST',
+                data: function(data){
+                    data.action = 'leyka_get_recurring_subscription_donations';
+                    data.recurring_subscription_id = $data_table.data('init-recurring-donation-id');
+                }
+            },
+
+            columns: [
+                {
+                    data: 'donation_id',
+                    className: 'column-id column-donation_id',
+                    render: function(donation_id){
+                        return '<a href="'+leyka.admin_url+'admin.php?page=leyka_donation_info&donation='+donation_id+'" target="_blank">'
+                            +donation_id
+                            +'</a>';
+                    },
+                },
+                {
+                    data: 'donor',
+                    className: 'column-donor',
+                    render: function(donor, type, row_data){
+                        return '<div class="donor-name">'
+                            +(donor.id ? '<a href="'+leyka.admin_url+'?page=leyka_donor_info&donor='+donor.id+'">' : '')
+                            +donor.name
+                            +(donor.id ? '</a>' : '')
+                            +'</div>'
+                            +'<div class="donor-email">'+donor.email+'</div>';
+                    }
+                },
+                {
+                    data: 'amount',
+                    className: 'column-amount data-amount',
+                    render: function(data_amount, type, row_data){
+
+                        let amount_html = data_amount.amount === data_amount.total ?
+                            data_amount.formatted+'&nbsp;'+data_amount.currency_label :
+                            data_amount.formatted+'&nbsp;'+data_amount.currency_label
+                            +'<span class="amount-total"> / '
+                            +data_amount.total_formatted+'&nbsp;'+data_amount.currency_label
+                            +'</span>';
+
+                        return '<span class="leyka-amount '+(data_amount.amount < 0.0 ? 'leyka-amount-negative' : '')+'">'
+                            +'<i class="icon-leyka-donation-status icon-'+row_data.status.id+' has-tooltip leyka-tooltip-align-left" title="'+row_data.status.description+'"></i>'
+                            +'<span class="leyka-amount-and-status">'
+                            +'<div class="leyka-amount-itself">'+amount_html+'</div>'
+                            +'<div class="leyka-donation-status-label label-'+row_data.status.id+'">'+row_data.status.label+'</div>'
+                            +'</span>'
+                            +'</span>';
+
+                    }
+                },
+                {data: 'date', className: 'column-date',},
+                {
+                    data: 'gateway_pm',
+                    className: 'column-gateway_pm data-gateway_pm',
+                    render: function(gateway_pm, type, row_data){
+
+                        return '<div class="leyka-gateway-name">'
+                            +'<img src="'+gateway_pm.gateway_icon_url+'" alt="'+gateway_pm.gateway_label+'">'
+                            +gateway_pm.gateway_label+','
+                            +'</div>'
+                            +'<div class="leyka-pm-name">'+gateway_pm.pm_label+'</div>';
+
+                    }
+                },
+            ],
+
+            rowCallback: function(row, data){ // After the data loaded from server, but before row is rendered in the table
+                $(row)
+                    .addClass('leyka-donations-table-row')
+                    .addClass('leyka-recurring-subscription-donations')
+                    .find('.has-tooltip').leyka_admin_tooltip();
+            },
+
+            lengthMenu: [[10, 25, 50, 100, 200], [10, 25, 50, 100, 200]],
+
+            language: {
+                processing:     leyka_dt.processing,
+                search:         leyka_dt.search,
+                lengthMenu:     leyka_dt.lengthMenu,
+                info:           leyka_dt.info,
+                infoEmpty:      leyka_dt.infoEmpty,
+                infoFiltered:   leyka_dt.infoFiltered,
+                infoPostFix:    leyka_dt.infoPostFix,
+                loadingRecords: leyka_dt.loadingRecords,
+                zeroRecords:    leyka_dt.zeroRecords,
+                emptyTable:     leyka_dt.emptyTable,
+                paginate: {
+                    first:    leyka_dt.paginate_first,
+                    previous: leyka_dt.paginate_previous,
+                    next:     leyka_dt.paginate_next,
+                    last:     leyka_dt.paginate_last
+                },
+                aria: {
+                    sortAscending:  leyka_dt.aria_sortAsc,
+                    sortDescending: leyka_dt.aria_sortDesc
+                }
+            }
+
+        });
+
+    }
 
 });
 /** Donations admin list page */
@@ -3450,30 +3103,6 @@ jQuery(document).ready(function($){
 
             e.preventDefault();
             $filters_warning_message.html(leyka.no_filters_while_exporting_warning_message).show();
-
-        }
-
-    });
-
-    $('body').on('click.leyka', '.leyka-tooltip-error-content-more', function(e){
-
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        let $link = $(this),
-            $tooltip_wrapper = $link.parents('.ui-widget-content:first'),
-            tooltip_content_extended = $link.parents('.ui-tooltip-content').find('.error-full-info-tooltip-content').html();
-
-        $tooltip_wrapper
-            .addClass('error-full-info-tooltip leyka-tooltip-x-wide leyka-tooltip-white')
-            .html(tooltip_content_extended);
-
-    }).on('click.leyka', '.error-full-info-tooltip', function(e){
-
-        if( !$(e.target).hasClass('close') && !$(e.target).is('a') ) {
-
-            e.preventDefault();
-            e.stopImmediatePropagation();
 
         }
 
@@ -4578,213 +4207,17 @@ jQuery(document).ready(function($){
     }
 
 });
-/** Admin JS - Recurring Subscription Info page **/
-jQuery(document).ready(function($){
-
-    LeykaStateControl.initVisibilityControlButtons();
-
-    // Recurring subscriptions Donations list data table:
-    let $data_table = $('.leyka-data-table.recurring-subscription-donations-table');
-
-    if($data_table.length && typeof $().DataTable !== 'undefined' && typeof leyka_dt !== 'undefined') {
-
-        $data_table.DataTable({
-
-            ordering:  false, /** @todo Add ordering to the table & it's AJAX query */
-            searching: false,
-            processing: true,
-            serverSide: true,
-            paging: false,
-            info: false,
-
-            ajax: {
-                url: leyka.ajaxurl,
-                type: 'POST',
-                data: function(data){
-                    data.action = 'leyka_get_recurring_subscription_donations';
-                    data.recurring_subscription_id = $data_table.data('init-recurring-donation-id');
-                    data.length = 5;
-                    data.draw = 5;
-                }
-            },
-
-            columns: [
-                {
-                    data: 'donation_id',
-                    className: 'column-id column-donation_id',
-                    render: function(donation_id){
-                        return '<div>' +
-                            '<div>'+donation_id+'</div>' +
-                            '<a href="'+leyka.admin_url+'admin.php?page=leyka_donation_info&donation='+donation_id+'" target="_blank">'
-                            +leyka_dt.toPayment
-                            +'</a>'
-                            +'</div>';
-
-                    },
-                },
-                {
-                    data: 'type',
-                    className: 'column-type data-type',
-                    render: function(type){
-                        return '<i class="icon-payment-type icon-'+type.name+' has-tooltip" title="'+type.label+'"></i>';
-                    },
-                },
-                {
-                    data: 'donor',
-                    className: 'column-donor',
-                    render: function(donor, type, row_data){
-                        return '<div class="donor-name">'
-                            +(donor.id ? '<a href="'+leyka.admin_url+'admin.php?page=leyka_donor_info&donor='+donor.id+'">' : '')
-                            +donor.name
-                            +(donor.id ? '</a>' : '')
-                            +'</div>'
-                            +'<div class="donor-email">'+donor.email+'</div>';
-                    }
-                },
-                {
-                    data: 'date',
-                    className: 'column-date',
-                    render: function (date) {
-                        return date.date_label+'<br>'+date.time_label;
-                    }
-                },
-                {
-                    data: 'amount',
-                    className: 'column-amount data-amount',
-                    render: function(data_amount, type, row_data){
-
-                        const amount_html = data_amount.amount === data_amount.total ?
-                            data_amount.formatted+'&nbsp;'+data_amount.currency_label :
-                            data_amount.formatted+'&nbsp;'+data_amount.currency_label
-                            +'<div class="amount-total">'
-                            +data_amount.total_formatted+'&nbsp;'+data_amount.currency_label
-                            +'</div>';
-
-                        const tooltip_html = row_data.status === 'failed' ?
-                            '<strong>Error '+row_data.status.error.id+'</strong>: '+row_data.status.error.name
-                            +'<p><a class="leyka-tooltip-error-content-more leyka-inner-tooltip leyka-tooltip-x-wide leyka-tooltip-white" title="" href="#">'
-                            +'More info'+ //TODO: Перевод
-                            +'</a></p>'
-                            +'<div class="error-full-info-tooltip-content">'+row_data.status.error.full_info+'</div>' :
-                            '<strong>'+row_data.status.label+':</strong> '+row_data.status.description;
-
-                        return '<span class="leyka-amount '+(data_amount.amount < 0.0 ? 'leyka-amount-negative' : '')+'">'
-                            // +'<i class="icon-leyka-donation-status icon-'+row_data.status.id+' has-tooltip leyka-tooltip-align-left" title="'+row_data.status.description+'"></i>'
-                            +'<span class="leyka-amount-and-status">'
-                            +'<div class="leyka-amount-itself" title="">'+amount_html+'</div>'
-                            +'<div class="leyka-donation-status-label label-'+row_data.status.id+' has-tooltip leyka-tooltip-align-left leyka-tooltip-on-click" title="">'+row_data.status.label+'</div>'
-                            +'<span class="leyka-tooltip-content">'+tooltip_html+'</span></span></span>';
-
-                    }
-                },
-                {
-                    data: 'gateway_pm',
-                    className: 'column-gateway_pm data-gateway_pm',
-                    render: function(gateway_pm, type, row_data){
-
-                        return '<span class="leyka-gateway-pm has-tooltip leyka-tooltip-align-left" title="'+gateway_pm.gateway.label+' / '+gateway_pm.pm.label+'">'
-                            +'<div class="leyka-gateway-name">'
-                            +(gateway_pm.gateway.icon_url !== '' ?
-                                '<img src="'+gateway_pm.gateway.icon_url+'" alt="'+gateway_pm.gateway.label+'">' :
-                                '<img src="'+gateway_pm.leyka_plugin_base_url+'/img/pm-icons/custom-payment-info.svg" alt="'+gateway_pm.gateway.label+'">')
-                            +'</div>'
-                            +'<div class="leyka-pm-name">'
-                            +(gateway_pm.pm.label !== '' ? '<img src="'+gateway_pm.pm.admin_icon_url+'" alt="'+gateway_pm.pm.label+'">' : '')
-                            +'</div></span>';
-
-                    }
-                },
-                {
-                    data: 'donor',
-                    className: 'column-donor_message',
-                    render: function(donor, donation_id) {
-                        if(donor.email_date !== '') {
-                            return '<div class="donor has-thanks">'+
-                                '<span class="donation-email-status">'+leyka_dt.sent+'</span>'+
-                                '<span class="donation-email-date">'+donor.email_date+'</span>'+
-                            '</div>';
-                        } else {
-                            return '<div className="donor no-thanks" data-donation-id="'+donation_id+'" data-nonce="'+donor.wp_nonce+'">'+
-                                '<span className="donation-email-status">'+leyka_dt.notSent+'</span>'+
-                                '<span className="donation-email-action send-donor-thanks">'+leyka_dt.sendItNow+'</span>'+
-                            '</div>';
-                        }
-                    }
-                }
-            ],
-
-            rowCallback: function(row, data){ // After the data loaded from server, but before row is rendered in the table
-                $(row)
-                    .addClass('leyka-donations-table-row')
-                    .addClass('leyka-recurring-subscription-donations')
-                    .find('.has-tooltip').leyka_admin_tooltip();
-            },
-
-            lengthMenu: [[10, 25, 50, 100, 200], [10, 25, 50, 100, 200]],
-
-            language: {
-                processing:     leyka_dt.processing,
-                search:         leyka_dt.search,
-                lengthMenu:     leyka_dt.lengthMenu,
-                info:           leyka_dt.info,
-                infoEmpty:      leyka_dt.infoEmpty,
-                infoFiltered:   leyka_dt.infoFiltered,
-                infoPostFix:    leyka_dt.infoPostFix,
-                loadingRecords: leyka_dt.loadingRecords,
-                zeroRecords:    leyka_dt.zeroRecords,
-                emptyTable:     leyka_dt.emptyTable,
-                paginate: {
-                    first:    leyka_dt.paginate_first,
-                    previous: leyka_dt.paginate_previous,
-                    next:     leyka_dt.paginate_next,
-                    last:     leyka_dt.paginate_last
-                },
-                aria: {
-                    sortAscending:  leyka_dt.aria_sortAsc,
-                    sortDescending: leyka_dt.aria_sortDesc
-                }
-            }
-
-        });
-
-    }
-
-    $('.leyka-subscription-status.recurring-is-active-field input[type="checkbox"]').on('change', function() {
-
-        $.post(
-            ajaxurl,
-            {
-                name: 'action',
-                action: 'leyka_cancel_recurring_by_manager',
-                donation_id: $(this).data('donation-id'),
-                state: $(this).is(':checked')
-            },
-            null,
-            'json'
-        ).done(function(response){
-            if(response.status==='ok') {
-                location.reload();
-            }
-        });
-    })
-
-});
 /** Recurring subscriptions list page */
-jQuery(document).ready(function($){
-
-    LeykaStateControl.initVisibilityControlButtons();
-
-    $('.problematic-subscription-alert .leyka-button-close, .problematic-subscription-alert .leyka-button-ok').on('click', () => {
-        $('.problematic-subscription-alert').addClass('leyka-hidden');
-    });
-
-    $('.column-donation_id .leyka-content-wrapper .leyka-problematic').on('click', function() {
-        $(this).parent().find('.problematic-subscription-alert').removeClass('leyka-hidden');
-    });
-
-    leyka_equlize_elements_width('.leyka-admin-tablenav.top .leyka-filter-button');
-
-});
+// jQuery(document).ready(function($){
+//
+//     let $page_wrapper = $('.wrap');
+//     if( !$page_wrapper.length || $page_wrapper.data('leyka-admin-page-type') !== 'recurring-subscriptions-list-page' ) {
+//         return;
+//     }
+//
+//     // ...
+//
+// });
 /** Common wizards functions */
 
 // Expandable areas:
@@ -4881,7 +4314,7 @@ jQuery(document).ready(function($){
 
 // copy2clipboard
 jQuery(document).ready(function($){
-
+    
     function copyText2Clipboard(copyText) {
         var $copyBufferInput = $('<input>');
         $("body").append($copyBufferInput);
@@ -4889,24 +4322,23 @@ jQuery(document).ready(function($){
         document.execCommand("copy");
         $copyBufferInput.remove();
     }
-
+    
     function collectText2Copy($copyLink) {
-
-        let $clone = $copyLink.parent().clone();
+        var $clone = $copyLink.parent().clone();
         $clone.find('.copy-link').remove();
         $clone.find('.copy-done').remove();
-
-        let text = '';
-        let $inner_control = $clone.find('input[type="text"], input[type="color"], input[type="date"], input[type="datetime-local"], input[type="month"], input[type="email"], input[type="number"], input[type="search"], input[type="range"], input[type="search"], input[type="tel"], input[type="time"], input[type="url"], input[type="week"], textarea');
-
-        if($inner_control.length > 0) {
-            text = $inner_control.val();
-        } else {
+        
+        var text = '';
+        var $innerControl = $clone.find('input[type=text], input[type=color], input[type=date], input[type=datetime-local], input[type=month], input[type=email], input[type=number], input[type=search], input[type=range], input[type=search], input[type=tel], input[type=time], input[type=url], input[type=week], textarea');
+        
+        if($innerControl.length > 0) {
+            text = $innerControl.val();
+        }
+        else {
             text = $clone.text();
         }
-
+        
         return $.trim(text);
-
     }
     
     function addCopyControls($copyContainer) {

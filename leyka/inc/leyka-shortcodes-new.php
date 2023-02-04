@@ -45,7 +45,7 @@ function leyka_shortcode_amount_collected($atts) {
     }
 
     foreach(Leyka_Donations::get_instance()->get($donation_params) as $donation) {
-        $amount_collected += $atts['total_funded'] ? $donation->main_currency_amount_total : $donation->main_currency_amount;
+        $amount_collected += $atts['total_funded'] ? $donation->amount_total : $donation->amount;
     }
 
     return apply_filters(
@@ -121,75 +121,29 @@ function leyka_shortcode_donors_count($atts) {
         'unstyled' => 0, // True/1 to use Leyka styling for the output, false/0 otherwise
     ], $atts);
 
-    $atts['campaign_id'] = $atts['campaign_id'] === 'current' ?
-        (get_post() && get_post()->post_type === Leyka_Campaign_Management::$post_type ? get_the_ID() : false) :
-        ($atts['campaign_id'] === 'all' ? false : absint($atts['campaign_id']));
+    $donors_params = ['role__in' => [Leyka_Donor::DONOR_USER_ROLE,], 'number' => -1, 'fields' => 'id', 'meta_query' => [],];
 
-    if(leyka_options()->opt('donor_management_available')) {
+    if($atts['campaign_id']) {
 
-        $donors_params = ['role__in' => [Leyka_Donor::DONOR_USER_ROLE,], 'number' => -1, 'fields' => 'id', 'meta_query' => [],];
+        $atts['campaign_id'] = $atts['campaign_id'] === 'current' ?
+            (get_post() && get_post()->post_type === Leyka_Campaign_Management::$post_type ? get_the_ID() : false) :
+            ($atts['campaign_id'] === 'all' ? false : absint($atts['campaign_id']));
 
         if($atts['campaign_id']) {
             $donors_params['meta_query'][] = [
                 'key' => 'leyka_donor_campaigns',
-                'value' => 'i:'.absint($atts['campaign_id']).';', // A little freaky, I know, but it's all we could think of
+                'value' => 'i:'.absint($atts['campaign_id']).';', // A little freaky, I know, but it's the best we could think of
                 'compare' => 'LIKE',
             ];
         }
 
-        if($atts['recurring']) {
-            $donors_params['meta_query'][] = ['key' => 'leyka_donor_type', 'value' => 'regular',];
-        }
-
-        $query = new WP_User_Query($donors_params);
-        $donors_count = $query->get_total();
-
-    } else { // If Donors management option is off, Donors count is just unique Donations' Donors emails count
-
-        // We're going to need meta_value DISTINCT here. It's very rare case, so we are not using Leyka_Donations:
-        global $wpdb;
-
-        if(in_array(get_option('leyka_donations_storage_type'), ['sep', 'sep-incompleted'])) { // Separated Donations storage
-
-            $query_clauses = [
-                'campaign_id_where' => $atts['campaign_id'] ? "AND d.campaign_id = ".absint($atts['campaign_id']) : '',
-                'recurring_join' => $atts['recurring'] ?
-                    "LEFT JOIN {$wpdb->prefix}leyka_donations_meta dm ON d.ID = dm.donation_id" : '',
-                'recurring_where' => $atts['recurring'] ?
-                    "AND d.payment_type = 'rebill' AND dm.init_recurring_donation_id = 0" : '',
-            ];
-
-            $query = "SELECT COUNT(DISTINCT d.donor_email)
-            FROM {$wpdb->prefix}leyka_donations d
-            WHERE d.status = 'funded'
-                {$query_clauses['campaign_id_where']}
-                {$query_clauses['recurring_where']}";
-
-        } else { // Post-based Donations storage
-
-            $query_clauses = [
-                'campaign_id_join' => $atts['campaign_id'] ? "LEFT JOIN {$wpdb->postmeta} pm_2 ON p.ID = pm_2.post_id" : '',
-                'campaign_id_where' => $atts['campaign_id'] ?
-                    "AND pm_2.meta_key = 'leyka_campaign_id' AND pm_2.meta_value = ".absint($atts['campaign_id']) : '',
-                'recurring_join' => $atts['recurring'] ? "LEFT JOIN {$wpdb->postmeta} pm_3 ON p.ID = pm_3.post_id" : '',
-                'recurring_where' => $atts['recurring'] ?
-                    "AND p.post_parent = 0 AND pm_3.meta_key = 'leyka_payment_type' AND pm_3.meta_value = 'rebill'" : '',
-            ];
-
-            $query = "SELECT COUNT(DISTINCT pm_1.meta_value) FROM {$wpdb->postmeta} pm_1
-			LEFT JOIN {$wpdb->posts} p ON p.ID = pm_1.post_id
-            {$query_clauses['campaign_id_join']}
-            {$query_clauses['recurring_join']}
-            WHERE p.post_status = 'funded'
-			    AND pm_1.meta_key = 'leyka_donor_email'
-			    {$query_clauses['campaign_id_where']}
-			    {$query_clauses['recurring_where']}";
-
-        }
-
-        $donors_count = $wpdb->get_var($query);
-
     }
+    if($atts['recurring']) {
+        $donors_params['meta_query'][] = ['key' => 'leyka_donor_type', 'value' => 'regular',];
+    }
+
+    $query = new WP_User_Query($donors_params);
+    $donors_count = $query->get_total();
 
     return apply_filters(
         'leyka_shortcode_donors_count',
@@ -213,7 +167,6 @@ function leyka_shortcode_donations_list($atts) {
         'header_text' => apply_filters('leyka_shortcode_donations_list_header', __('Donations history', 'leyka'), $atts),
         'show_header' => 1,
         'show_name' => 1,
-        // Possible values: 0/false - don't show Donors' names at all, 1 - show names normally, 2 - show names masked
         'show_date' => 1,
         'show_time' => 1,
         'show_campaign' => 0,
@@ -270,16 +223,7 @@ function leyka_shortcode_donations_list($atts) {
             $line['donation_date'] = $donation->date_time_label;
         }
         if($atts['show_name']) {
-
             $line['donation_donor_name'] = $donation->donor_name ? : __('Anonymous', 'leyka');
-            $line['donation_donor_name'] = absint($atts['show_name']) === 1 ?
-                $line['donation_donor_name'] :
-                str_replace(
-                    mb_substr($line['donation_donor_name'], 1),
-                    str_repeat('*', mb_strlen($line['donation_donor_name']) - 1),
-                    $line['donation_donor_name']
-                );
-
         }
         if($atts['show_type_text']) {
             $line['donation_type'] = $donation->type === 'rebill' ?

@@ -120,14 +120,6 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
         _e('No donations avaliable.', 'leyka');
     }
 
-    public function single_row($donation) {
-
-        echo '<tr class="leyka-donation-'.$donation->status.'-row">';
-        $this->single_row_columns($donation);
-        echo '</tr>';
-
-    }
-
     /**
      *  An associative array of columns.
      *
@@ -144,7 +136,7 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
             'amount' => leyka_options()->opt('admin_donations_list_display') === 'amount-column' ?
                 __('Amount / Without commission', 'leyka') : __('Amount', 'leyka'),
             'date' => __('Date', 'leyka'),
-            'gateway_pm' => _x('Payment method', 'Short name, like "method"', 'leyka'),
+            'gateway_pm' => __('Payment method', 'leyka'),
             'emails' => __('Donor email', 'leyka'),
         ];
 
@@ -152,8 +144,8 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
             $columns['amount_total'] = __('Total amount', 'leyka');
         }
 
-        $columns['donor_subscription'] = __('Mailout', 'leyka');
-        $columns['donor_comment'] = _x('Comment', "[Donor's comment. Should be short]", 'leyka');
+        $columns['donor_subscription'] = __('Donor subscription', 'leyka');
+        $columns['donor_comment'] = __('Donor comment', 'leyka');
 
         // Additional fields columns:
         foreach(leyka_options()->opt('additional_donation_form_fields_library') as $field_id => $field_settings) {
@@ -195,11 +187,7 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
 
         switch($column_id) {
             case 'id':
-                return apply_filters(
-                    'leyka_admin_donation_id_column_content',
-                    $donation->id.'<br><a href="'.admin_url('admin.php?page=leyka_donation_info&donation='.$donation->id).'" class="donation-edit-link">'.__('Details', 'leyka').'</a>',
-                    $donation
-                );
+                return apply_filters('leyka_admin_donation_id_column_content', $donation->id, $donation);
             case 'payment_type':
                 return apply_filters(
                     'leyka_admin_donation_type_column_content',
@@ -251,17 +239,10 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
 
         $campaign = new Leyka_Campaign($donation->campaign_id);
 
-        $campaign_title_stripped = leyka_strip_string_by_words($campaign->title, 30);
-        $is_title_stripped = $campaign_title_stripped !== $campaign->title;
-
-        $column_content = '<div class="donation-campaign '.($is_title_stripped ? 'has-tooltip' : '').'" '.($is_title_stripped ? 'title="'.esc_attr($campaign->title).'"' : '').'>
-                <a href="'.admin_url('post.php?post='.$campaign->id.'&action=edit').'">'
-                    .($is_title_stripped ? $campaign_title_stripped.'&nbsp;&mldr;' : $campaign->title)
-                .'</a>
-            </div>'
+        $column_content = '<div class="donation-campaign"><a href="'.Leyka_Donation_Management::get_donation_edit_link($donation).'">'.$campaign->title.'</a></div>'
             .$this->row_actions([
-                'campaign_edit' => '<a href="'.admin_url('post.php?post='.$campaign->id.'&action=edit').'">'.__('Edit').'</a>',
-                'campaign_public' => '<a href="'.get_permalink($donation->campaign_id).'">'.__('Public page', 'leyka').'</a>',
+                'donation_page' => '<a href="'.Leyka_Donation_Management::get_donation_edit_link($donation).'">'.__('Edit').'</a>',
+                'delete' => '<a href="'.Leyka_Donation_Management::get_donation_delete_link($donation).'">'.__('Delete').'</a>',
             ]);
 
         return apply_filters('leyka_admin_donation_campaign_column_content', $column_content, $donation);
@@ -270,17 +251,14 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
 
     public function column_donor($donation) { /** @var $donation Leyka_Donation_Base */
 
-        $donor_phone = leyka_get_donor_phone($donation);
-
         $donor_data_html = apply_filters(
             'leyka_admin_donation_donor_column_content',
             '<div class="donor-name">'
-                .(leyka_options()->opt('donor_management_available') && $donation->donor_id ? '<a href="'.admin_url('admin.php?page=leyka_donor_info&donor='.$donation->donor_id).'">' : '')
+                .(leyka_options()->opt('donor_management_available') && $donation->donor_id ? '<a href="'.admin_url('?page=leyka_donor_info&donor='.$donation->donor_id).'">' : '')
                 .$donation->donor_name
                 .(leyka_options()->opt('donor_management_available') ? '</a>' : '')
             .'</div>'
-            .'<div class="donor-additional-data donor-email">'.$donation->donor_email.'</div>'
-            .($donor_phone ? '<div class="donor-additional-data donor-phone">'.$donor_phone.'</div>' : ''),
+            .'<div class="donor-email">'.$donation->donor_email.'</div>',
             $donation
         );
 
@@ -315,18 +293,18 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
         $donor_additional_data_html .= '</ul>';
 
         return '<div class="leyka-donor-data-cell-wrapper">'
-            .'<div class="leyka-donor-data-additional">'
-                .'<i class="icon-donor-more-data has-tooltip leyka-tooltip-on-click leyka-tooltip-wide leyka-tooltip-white" data-tooltip-additional-classes="leyka-admin-tooltip-donor-more-data"></i>'
-                .'<span class="leyka-tooltip-content">'
-                    .apply_filters(
-                        'leyka_admin_donation_donor_column_additional_data_full_html',
-                        $donor_additional_data_html,
-                        $donation
-                    )
-                .'</span>'
-            .'</div>'
-            .'<div class="leyka-donor-data-main">'.$donor_data_html.'</div>'
-        .'</div>';
+                .'<div class="leyka-donor-data-additional">'
+                    .'<i class="icon-donor-more-data has-tooltip leyka-tooltip-on-click leyka-tooltip-wide leyka-tooltip-white" data-tooltip-additional-classes="leyka-admin-tooltip-donor-more-data"></i>'
+                        .'<span class="leyka-tooltip-content">'
+                            .apply_filters(
+                                'leyka_admin_donation_donor_column_additional_data_full_html',
+                                $donor_additional_data_html,
+                                $donation
+                            )
+                        .'</span>'
+                    .'</div>'
+                .'<div class="leyka-donor-data-main">'.$donor_data_html.'</div>'
+            .'</div>';
 
     }
 
@@ -336,64 +314,27 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
             $amount = $donation->amount == $donation->amount_total ?
                 $donation->amount_formatted.'&nbsp;'.$donation->currency_label :
                 $donation->amount_formatted.'&nbsp;'.$donation->currency_label
-                    .'<div class="amount-total">'.$donation->amount_total_formatted.'&nbsp;'.$donation->currency_label.'</div>';
+                    .'<span class="amount-total"> / '
+                        .$donation->amount_total_formatted.'&nbsp;'.$donation->currency_label
+                    .'</span>';
         } else {
             $amount = $donation->amount_formatted.'&nbsp;'.$donation->currency_label;
         }
 
-        if($donation->status === 'failed') {
-
-            $error = $donation->error; /** @var $error Leyka_Donation_Error */
-            $error = is_a($error, 'Leyka_Donation_Error') ?
-                $error : Leyka_Donations_Errors::get_instance()->get_error_by_id(false);
-
-            $tooltip_content = '<strong>'.sprintf(__('Error %s', 'leyka'), $error->id).'</strong>: '.mb_lcfirst($error->name)
-                .'<p><a class="leyka-tooltip-error-content-more leyka-inner-tooltip leyka-tooltip-x-wide leyka-tooltip-white" title="" href="#">'
-                    .__('More info', 'leyka')
-                .'</a></p>'
-                .'<div class="error-full-info-tooltip-content">'.leyka_show_donation_error_full_info($error, true).'</div>';
-
-        } else {
-            $tooltip_content = '<strong>'.$donation->status_label.':</strong> '.mb_lcfirst($donation->status_description);
-        }
-
         $column_content = '<span class="leyka-amount '.apply_filters('leyka_admin_donation_amount_column_css', ($donation->amount < 0.0 ? 'leyka-amount-negative' : '')).'">'
-            .'<span class="leyka-amount-and-status">'
-                .'<div class="leyka-amount-itself '.(leyka_options()->opt('admin_donations_list_amount_display') == 'amount-column' ? 'has-tooltip leyka-tooltip-align-left' : '').'" title="">'
-                    .$amount
-                .'</div>'
-//                .(
-//                    leyka_options()->opt('admin_donations_list_amount_display') == 'amount-column' ?
-//                        '<span class="leyka-tooltip-content">'
-//                            .apply_filters(
-//                                'leyka_admin_donations_list_donation_amounts_tooltip_content',
-//                                '<ul>'
-//                                .'<li>'
-//                                    .__('Full donation amount:', 'leyka')
-//                                    .'<strong class="leyka-black">'.$donation->amount_formatted.'&nbsp;'.$donation->currency_label.'</strong>'
-//                                .'</li>'
-//                                .'<li>'
-//                                    .__('Total donation amount:', 'leyka')
-//                                    .'<strong class="leyka-grey">'.$donation->amount_total_formatted.'&nbsp;'.$donation->currency_label.'</strong>'
-//                                .'</li>'
-//
-//                                .'</ul>',
-//                                $donation
-//                            )
-//                        .'</span>' : ''
-//                )
-            .'</span>'
-            .'<div class="leyka-donation-status-label label-'.$donation->status.' has-tooltip leyka-tooltip-align-left leyka-tooltip-on-click" title="">'
-                .Leyka::get_donation_status_info($donation->status, 'short_label')
-            .'</div>'
+            .'<i class="icon-leyka-donation-status icon-'.$donation->status.' has-tooltip leyka-tooltip-align-left" title=""></i>'
             .'<span class="leyka-tooltip-content">'
                 .apply_filters(
                     'leyka_admin_donations_list_donation_status_tooltip_content',
-                    $tooltip_content,
+                    '<strong>'.$donation->status_label.':</strong> '.mb_lcfirst($donation->status_description),
                     $donation
                 )
             .'</span>'
-        .'</span>';
+            .'<span class="leyka-amount-and-status">'
+                .'<div class="leyka-amount-itself">'.$amount.'</div>'
+                .'<div class="leyka-donation-status-label label-'.$donation->status.'">'.$donation->status_label.'</div>'
+            .'</span>
+        </span>';
 
         return apply_filters('leyka_admin_donation_amount_column_content', $column_content, $donation);
 
@@ -411,35 +352,18 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
 
     public function column_gateway_pm($donation) { /** @var $donation Leyka_Donation_Base */
 
-        $gateway = $donation->gateway_id ? leyka_get_gateway_by_id($donation->gateway_id) : false;
-        $pm = $donation->gateway_id && $donation->gateway_id !== 'correction' ?
-            leyka_get_pm_by_id($donation->pm_full_id, true) : $donation->pm_id;
-
         $gateway_label = $donation->gateway_id && $donation->gateway_id !== 'correction' ?
             $donation->gateway_label : __('Custom payment info', 'leyka');
-        $pm_label = is_a($pm, 'Leyka_Payment_Method') ? $donation->pm_label : $donation->pm;
-
-        $currency_exchange_tooltip = $donation->main_currency_amount." ".$donation->main_currency_id
-            .( $donation->main_currency_amount !== $donation->main_currency_amount_total ? " / ".$donation->main_currency_amount_total." ".$donation->main_currency_id : "")
-            ." </br> 1 ".$donation->main_currency_id." = ".$donation->main_currency_rate." ".$donation->currency_id;
+        $pm_label = $donation->gateway_id && $donation->gateway_id !== 'correction' ? $donation->pm_label : $donation->pm;
+        $gateway = $donation->gateway_id ? leyka_get_gateway_by_id($donation->gateway_id) : false;
 
         return apply_filters(
             'leyka_admin_donation_gateway_pm_column_content',
-            "<span class='leyka-gateway-pm '>
-                <div class='leyka-gateway-name has-tooltip leyka-tooltip-align-left' title='".$gateway_label.' / '.$pm_label."'>"
-                    .($gateway ?
-                        '<img src="'.$gateway->icon_url.'" alt="'.$gateway_label.'">' :
-                        '<img src="'.LEYKA_PLUGIN_BASE_URL.'/img/pm-icons/custom-payment-info.svg" alt="'.$pm.'">')
-                ."</div>
-                <div class='leyka-pm-name has-tooltip leyka-tooltip-align-left' title='".$gateway_label.' / '.$pm_label."'>"
-                    .(is_a($pm, 'Leyka_Payment_Method') ? "<img src='".$pm->admin_icon_url."' alt='$pm_label'>" : '')
-                ."</div>"
-                .($donation->currency_id !== $donation->main_currency_id ?
-                    "<div class='leyka-currency-exchange has-tooltip leyka-tooltip-align-left' title='".$currency_exchange_tooltip."' >"
-                    ."<img src='".LEYKA_PLUGIN_BASE_URL."/img/icon-currency-exchange.svg' alt='currency-exchange'>"
-                    ."</div>"
-                    : "")
-            ."</span>",
+            "<div class='leyka-gateway-name'>"
+                .($gateway ? "<img src='".$gateway->icon_url."' alt='$gateway_label'>" : '')
+                ."$gateway_label,
+            </div>
+            <div class='leyka-pm-name'>$pm_label</div>",
             $donation
         );
 
@@ -466,11 +390,13 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
     public function column_donor_subscription($donation) { /** @var $donation Leyka_Donation_Base */
 
         if($donation->donor_subscribed == 1) { // true|1|'1' - all news
-            $column_content = '<div class="donor-subscription-status total has-tooltip" title="'.__('Full subscription (on all website email mailouts)', 'leyka').'"><i class="donor-subscription full-subscription"></div>';
+            $column_content = '<div class="donor-subscription-status total">'.__('Full subscription', 'leyka').'</div>';
         } else if($donation->donor_subscribed > 0) { // Other positive integer (campaign ID) - only news for given campaign
-            $column_content = '<div class="donor-subscription-status on-campaign has-tooltip" title="'.__('Subscription on the campaign news', 'leyka').'"><i class="donor-subscription campaign-subscription"></div>';
+            $column_content = '<div class="donor-subscription-status on-campaign">'
+                .sprintf(__('On <a href="%s">campaign</a> news', 'leyka'), admin_url('post.php?post='.$donation->campaign_id.'&action=edit'))
+            .'</div>';
         } else {
-            $column_content = '<div class="donor-subscription-status none"></div>';
+            $column_content = '<div class="donor-subscription-status none">'.__('None', 'leyka').'</div>';
         }
 
         return apply_filters('leyka_admin_donation_donor_subscription_column_content', $column_content, $donation);
@@ -480,7 +406,7 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
     /**
      * Table filters panel.
      *
-     * @param string $which "top" from the upper panel or "bottom" for footer.
+     * @param string $which "top" fro the upper panel or "bottom" for footer.
      */
     protected function extra_tablenav($which) { // The table filters are external - no need for them here
     }
@@ -585,14 +511,9 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
 
         ob_clean();
 
-        $columns = [
-            'ID', 'Имя донора', 'Email', 'Тип платежа', 'Плат. оператор', 'Способ платежа', 'Полная сумма', 'Итоговая сумма', 'Валюта', 'Дата пожертвования', 'Статус', 'Кампания', 'Назначение', 'Подписка на рассылку', 'Email подписки', 'Комментарий',
-        ];
-
-        // Additional donation form fields headers:
-        foreach(leyka_options()->opt('additional_donation_form_fields_library') as $field_id => $field_settings) {
-            $columns[] = '['.$field_id.'] '.$field_settings['title'];
-        }
+        $columns = apply_filters('leyka_donations_export_headers', [
+            'ID', 'Имя донора', 'Email', 'Тип платежа', 'Плат. оператор', 'Способ платежа', 'Полная сумма', 'Итоговая сумма', 'Валюта', 'Дата пожертвования', 'Статус', 'Кампания', 'Назначение', 'Подписка на рассылку', 'Email подписки', 'Комментарий'
+        ]);
 
         $rows = [];
         foreach($this->items as $donation) { /** @var $donation Leyka_Donation_Base */
@@ -600,6 +521,12 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
             $campaign = $donation->campaign;
 
             $currency = $donation->currency_label;
+//            $currency_label_encoded = @iconv( // Sometimes currency sighs can't be encoded, so check for it
+//                'UTF-8',
+//                apply_filters('leyka_donations_export_content_charset', 'CP1251//TRANSLIT//IGNORE'),
+//                $currency
+//            );
+//            $currency = $currency_label_encoded ? $currency : $donation->currency_id;
 
             $donor_subscription = 'Нет';
             if($donation->donor_subscribed === true) {
@@ -608,42 +535,32 @@ class Leyka_Admin_Donations_List_Table extends WP_List_Table {
                 $donor_subscription = 'О кампании «'.$campaign->title.'»';
             }
 
-            $row = [
-                $donation->id,
-                $donation->donor_name,
-                $donation->donor_email,
-                $donation->payment_type_label,
-                $donation->gateway_label,
-                $donation->payment_method_label,
-                str_replace('.', ',', $donation->amount),
-                str_replace('.', ',', $donation->amount_total),
-                $currency,
-                $donation->date_time_label,
-                $donation->status_label,
-                $campaign->title,
-                $campaign->payment_title,
-                $donor_subscription,
-                $donation->donor_subscription_email,
-                $donation->donor_comment,
-            ];
-
-            foreach(leyka_options()->opt('additional_donation_form_fields_library') as $field_id => $field_settings) {
-
-                $row[] = is_array($donation->additional_fields) && isset($donation->additional_fields[$field_id]) ?
-                    $donation->additional_fields[$field_id] : '';
-
-            }
-
-            $rows[] = apply_filters('leyka_donations_export_line', $row, $donation);
+            $rows[] = apply_filters(
+                'leyka_donations_export_line',
+                [
+                    $donation->id,
+                    $donation->donor_name,
+                    $donation->donor_email,
+                    $donation->payment_type_label,
+                    $donation->gateway_label,
+                    $donation->payment_method_label,
+                    str_replace('.', ',', $donation->amount),
+                    str_replace('.', ',', $donation->amount_total),
+                    $currency,
+                    $donation->date_time_label,
+                    $donation->status_label,
+                    $campaign->title,
+                    $campaign->payment_title,
+                    $donor_subscription,
+                    $donation->donor_subscription_email,
+                    $donation->donor_comment,
+                ],
+                $donation
+            );
 
         }
 
-        // It will exit automatically:
-        leyka_generate_csv(
-            'donations-'.date( get_option('date_format').'-'.str_replace([':'], ['.'], get_option('time_format')) ),
-            apply_filters('leyka_donations_export_rows', $rows),
-            apply_filters('leyka_donations_export_headers', $columns)
-        );
+        leyka_generate_csv('donations-'.date('d.m.Y-H.i.s'), $rows, $columns); // It will exit automatically
 
     }
 

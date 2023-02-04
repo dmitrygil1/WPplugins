@@ -287,8 +287,8 @@
 
 		// Register Block Type leyka/form.
 		registerBlockType( 'leyka/form', {
-			title: __('Collecting donations', 'leyka'),
-			description: __('Donation form', 'leyka'),
+			title: thisBlock.title,
+			description: thisBlock.description,
 			icon: icon,
 			category: 'leyka',
 			keywords: [ 'campaign', 'leyka', 'form', 'payment' ],
@@ -631,8 +631,8 @@
 		}
 
 		registerBlockType( 'leyka/card', {
-			title: __('Campaign Card', 'leyka'),
-			description: __('Campaign informer with configurable elements', 'leyka'),
+			title: thisBlock.title,
+			description: thisBlock.description,
 			icon: icon,
 			category: 'leyka',
 			keywords: [ 'campaign', 'leyka', 'form', 'payment' ],
@@ -1140,8 +1140,8 @@
 		};
 
 		registerBlockType( 'leyka/cards', {
-			title: __('Campaigns Cards', 'leyka'),
-			description: __('Campaigns informer with configurable elements', 'leyka'),
+			title: thisBlock.title,
+			description: thisBlock.description,
 			icon: icon,
 			category: 'leyka',
 			keywords: [ 'campaign', 'leyka', 'form', 'payment' ],
@@ -1317,9 +1317,9 @@
 
 								el( SelectControl,
 									{
-										label: __( 'Order by', 'leyka' ),
+										label: __( 'Order by' ),
 										options : [
-											{ value: 'date', label: __( 'Date', 'leyka' ) },
+											{ value: 'date', label: __( 'Date' ) },
 											{ value: 'post__in', label: blockI18n.includedCampaigns },
 										],
 										value: props.attributes.queryOrderBy,

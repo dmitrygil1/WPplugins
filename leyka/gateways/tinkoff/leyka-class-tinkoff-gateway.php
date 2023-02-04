@@ -77,7 +77,6 @@ class Leyka_Tinkoff_Gateway extends Leyka_Gateway {
                 'payment_type' => 'rebill',
                 'amount_total' => 'auto',
                 'init_recurring_donation' => $init_recurring_donation->id,
-                'date' => '' // don't copy the date
             ],
             ['recalculate_total_amount' => true,]
         );
@@ -347,10 +346,6 @@ class Leyka_Tinkoff_Gateway extends Leyka_Gateway {
                 }
 
                 $donation->add_gateway_response($response);
-
-                if($donation->type === 'rebill') {
-                    do_action('leyka_new_rebill_donation_added', $donation);
-                }
 
             }
 

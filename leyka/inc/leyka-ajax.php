@@ -748,25 +748,6 @@ function leyka_cancel_recurring_subscription(){
 add_action('wp_ajax_leyka_cancel_recurring', 'leyka_cancel_recurring_subscription'); // leyka_unsubscribe_persistent_campaign
 add_action('wp_ajax_nopriv_leyka_cancel_recurring', 'leyka_cancel_recurring_subscription');
 
-function leyka_cancel_recurring_subscription_by_manager(){
-
-    $donation_id = absint($_POST['donation_id']);
-    $init_recurring_donation = Leyka_Donations::get_instance()->get($donation_id);
-
-    if( $_POST['state'] === 'true' && !$init_recurring_donation->recurring_is_active ) {
-        $init_recurring_donation->recurring_is_active = 'true';
-    } else if( $_POST['state'] !== 'true' && $init_recurring_donation->recurring_is_active ) {
-
-        $donation_gateway = leyka_get_gateway_by_id($init_recurring_donation->gateway_id);
-        $donation_gateway->cancel_recurring_subscription($init_recurring_donation);
-
-    }
-
-    die(json_encode(['status' => 'ok']));
-
-}
-add_action('wp_ajax_leyka_cancel_recurring_by_manager', 'leyka_cancel_recurring_subscription_by_manager');
-
 function leyka_reset_campaign_attachment(){
 
     $_POST['campaign_id'] = empty($_POST['campaign_id']) ? false : absint($_POST['campaign_id']);
@@ -1086,9 +1067,9 @@ function leyka_admin_get_donor_donations(){
                 'pm_label' => $donation->pm_label,
             ],
             'amount' => [
-                'amount_formatted' => $donation->main_currency_amount,
-                'amount_total_formatted' => $donation->main_currency_amount_total,
-                'currency_label' => leyka_get_currency_label(),
+                'amount_formatted' => $donation->amount_formatted,
+                'amount_total_formatted' => $donation->amount_total_formatted,
+                'currency_label' => $donation->currency_label,
             ],
         ];
 
@@ -1220,34 +1201,13 @@ function leyka_admin_get_recurring_subscription_donations(){
     foreach($donations as $donation) {
 
         $gateway = leyka_get_gateway_by_id($donation->gateway_id);
-        $pm = $donation->gateway_id && $donation->gateway_id !== 'correction' ?
-            leyka_get_pm_by_id($donation->pm_full_id, true) : $donation->pm_id;
-
-        if($donation->status === 'failed') {
-
-            $error = $donation->error; /** @var $error Leyka_Donation_Error */
-            $error = is_a($error, 'Leyka_Donation_Error') ?
-            $error : Leyka_Donations_Errors::get_instance()->get_error_by_id(false);
-
-        }
 
         $result['data'][] = [
             'donation_id' => $donation->id,
-            'type' => [
-                'name' => $donation->type,
-                'label' => $donation->type_label
-            ],
             'donor' => [
                 'name' => $donation->donor_name,
                 'email' => $donation->donor_email,
                 'id' => leyka_options()->opt('donor_management_available') && $donation->donor_id ? $donation->donor_id : 0,
-                'email_sent' => (bool)$donation->donor_email_date,
-                'email_date' => $donation->donor_email_date ? date('d.m.Y', $donation->donor_email_date) : '',
-                'wp_nonce' => wp_create_nonce('leyka_donor_email')
-            ],
-            'date' => [
-                'date_label' => $donation->date_label,
-                'time_label' => $donation->time_label
             ],
             'amount' => [
                 'amount' => $donation->amount,
@@ -1260,24 +1220,14 @@ function leyka_admin_get_recurring_subscription_donations(){
                 'id' => $donation->status,
                 'label' => $donation->status_label,
                 'description' => $donation->status_description,
-                'error' => [
-                    'id' => $donation->status === 'failed' ? $error->id : '',
-                    'name' => $donation->status === 'failed' ? $error->name : '',
-                    'full_info' => $donation->status === 'failed' ? leyka_show_donation_error_full_info($error, true) : ''
-                ]
             ],
+            'date' => $donation->date_time_label,
             'gateway_pm' => [
-                'leyka_plugin_base_url' => LEYKA_PLUGIN_BASE_URL, // TODO: Получить в JS?
-                'gateway' => [
-                    'icon_url' => $gateway ? $gateway->icon_url : '',
-                    'label' => $donation->gateway_id == 'correction' ?
-                        __('Custom payment info', 'leyka') : $donation->gateway_label
-                ],
-                'pm' => [
-                    'label' => is_a($pm, 'Leyka_Payment_Method') ? $donation->pm_label : '',
-                    'admin_icon_url' => is_a($pm, 'Leyka_Payment_Method') ? $pm->admin_icon_url : ''
-                ]
-            ]
+                'gateway_icon_url' => $gateway ? $gateway->icon_url : '',
+                'gateway_label' => $donation->gateway_id == 'correction' ?
+                    __('Custom payment info', 'leyka') : $donation->gateway_label,
+                'pm_label' => $donation->pm_label,
+            ],
         ];
 
     }
@@ -1498,8 +1448,3 @@ function leyka_support_packages_set_no_campaign_behavior(){
 
 }
 add_action('wp_ajax_leyka_support_packages_set_no_campaign_behavior', 'leyka_support_packages_set_no_campaign_behavior');
-
-function leyka_ajax_get_currencies_rates() {
-    die(json_encode(leyka_get_currencies_rates()));
-}
-add_action('wp_ajax_leyka_get_currencies_rates', 'leyka_ajax_get_currencies_rates');

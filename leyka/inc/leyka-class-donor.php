@@ -71,7 +71,7 @@ class Leyka_Donor {
             $donor_user->add_cap(self::DONOR_ACCOUNT_ACCESS_CAP);
 
             // If Donor user just acquired account access, make him set up a password:
-            update_user_meta($donor_user->ID, 'leyka_account_activation_code', wp_generate_password(60, false));
+            update_user_meta($donor_user->id, 'leyka_account_activation_code', wp_generate_password(60, false));
 
         } else {
             $donor_user->remove_cap(self::DONOR_ACCOUNT_ACCESS_CAP);
@@ -190,7 +190,7 @@ class Leyka_Donor {
 
             if($donations[$i]->status === 'funded') {
                 $donor_data['amount_donated'] = empty($donor_data['amount_donated']) ?
-                    $donations[$i]->main_currency_amount : $donor_data['amount_donated'] + $donations[$i]->main_currency_amount;
+                    $donations[$i]->amount : $donor_data['amount_donated'] + $donations[$i]->amount;
             }
 
         }
@@ -294,7 +294,6 @@ class Leyka_Donor {
                 'gateways' => empty($meta['leyka_donor_gateways']) ?
                     [] : maybe_unserialize($meta['leyka_donor_gateways'][0]),
                 'amount_donated' => empty($meta['leyka_amount_donated']) ? 0.0 : (float)$meta['leyka_amount_donated'][0],
-                'amount_donated_currency' => empty($meta['leyka_amount_donated_currency']) ? '' : $meta['leyka_amount_donated_currency'][0],
                 //'comments' => empty($meta['leyka_donor_comments']) ? [] : maybe_unserialize($meta['leyka_donor_comments']),
             ];
 
@@ -309,13 +308,6 @@ class Leyka_Donor {
                     $comment = maybe_unserialize($comment);
                 }
 
-            }
-
-            $main_currency = leyka_get_main_currency();
-
-            if( empty($this->_meta['amount_donated_currency']) || $this->_meta['amount_donated_currency'] !== $main_currency) {
-                self::calculate_donor_metadata($this);
-                $this->amount_donated_currency = $main_currency;
             }
 
         }
@@ -459,9 +451,6 @@ class Leyka_Donor {
             case 'amount_donated':
                 return $this->_meta['amount_donated'];
 
-            case 'amount_donated_currency':
-                return !empty($this->_meta['amount_donated_currency']) ? $this->_meta['amount_donated_currency'] : '';
-
             default:
                 return apply_filters('leyka_get_unknown_donor_field', null, $field, $this);
         }
@@ -594,14 +583,6 @@ class Leyka_Donor {
                 }
                 $this->_meta['amount_donated'] = (float)$value;
                 $res = update_user_meta($this->_id, 'leyka_amount_donated', $value);
-                break;
-
-            case 'amount_donated_currency':
-                if($value == $this->amount_donated_currency) {
-                    return true;
-                }
-                $this->_meta['amount_donated_currency'] = (string)$value;
-                $res = update_user_meta($this->_id, 'leyka_amount_donated_currency', $value);
                 break;
 
             case 'pass':

@@ -83,8 +83,6 @@ function leyka_handle_plugin_update() {
         return;
     }
 
-    global $wpdb;
-
     leyka_create_separate_donations_db_tables(); // Create plugin-specific DB tables if needed
 
     if($leyka_last_ver && version_compare($leyka_last_ver, '3.8.0.1', '<=')) { // CP IPs list fix
@@ -98,6 +96,8 @@ function leyka_handle_plugin_update() {
     }
 
     if($leyka_last_ver && version_compare($leyka_last_ver, '3.20.0.1', '<=')) {
+
+        global $wpdb;
 
         // Old (rur) to new (rub) currency ID transition:
         if(Leyka_Options_Controller::get_option_value('currency_main') == 'rur') {
@@ -245,26 +245,10 @@ function leyka_handle_plugin_update() {
 
     }
 
-    if($leyka_last_ver && version_compare($leyka_last_ver, '3.26.1', '<=')) {
-
-        //Delete 'leyka_recurring_funded_rebills_number' meta field for all subscriptions, in order to recalc it correctly on the next request
-        $wpdb->delete($wpdb->prefix.'postmeta',
-            ['meta_key' => 'leyka_recurring_funded_rebills_number']
-        );
-
-    }
-
-    if($leyka_last_ver && version_compare($leyka_last_ver, '3.28', '<=')) {
-        leyka_refresh_currencies_rates();
-    }
-
     do_action('leyka_plugin_update', $leyka_last_ver); // Warning: Extensions can't use this hook, as they are initialized later
 
     // Set a flag to flush permalinks (needs to be done a bit later than this activation itself):
     update_option('leyka_permalinks_flushed', 0);
-
-    // Clear dashboard portlets cache
-    leyka_clear_dashboard_cache();
 
     if( !$leyka_last_ver ) {
         update_option('leyka_init_wizard_redirect', true);

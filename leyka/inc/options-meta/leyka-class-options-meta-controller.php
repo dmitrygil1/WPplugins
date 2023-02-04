@@ -63,7 +63,7 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
 
         if($options_group === 'all') {
             return $this->_get_options_meta(
-                ['main', 'org', 'person', 'payments', 'currency', 'cryptocurrencies', 'email', 'templates', 'analytics', 'terms', 'admin',]
+                ['main', 'org', 'person', 'payments', 'currency', 'email', 'templates', 'analytics', 'terms', 'admin',]
             );
         } else if(is_array($options_group)) {
 
@@ -84,7 +84,6 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
             case 'person': return $this->_get_meta_person();
             case 'payments': return $this->_get_meta_payments();
             case 'currency': return $this->_get_meta_currency();
-            case 'cryptocurrencies': return $this->_get_meta_cryptocurrencies();
             case 'email':
             case 'emails':
                return $this->_get_meta_emails();
@@ -135,13 +134,6 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'required' => true,
                 'list_entries' => leyka_get_countries_list(),
             ],
-            'phone_format' => [
-                'type' => 'select',
-                'default' => leyka_get_default_phone_format_id(),
-                'title' => __('Select phone format', 'leyka'),
-                'list_entries' => leyka_get_phone_formats_list(),
-                'description' => __('Select a phone number format suitable for the selected country', 'leyka'),
-            ],
             'receiver_legal_type' => [
                 'type' => 'radio',
                 'title' => __('Donations receiver legal type', 'leyka'),
@@ -189,20 +181,20 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'default' => leyka_get_default_success_page(),
                 'title' => __('Page of successful donation', 'leyka'),
                 'comment' => __('Select a page for donor to redirect to when payment is successful.', 'leyka'),
-                'list_entries' => leyka_get_posts_list(['page']),
+                'list_entries' => 'leyka_get_pages_list',
             ],
             'failure_page' => [
                 'type' => 'select',
                 'default' => leyka_get_default_failure_page(),
                 'title' => __('Page of failed donation', 'leyka'),
                 'comment' => __('Select a page for donor to redirect to when payment is failed for some reason.', 'leyka'),
-                'list_entries' => leyka_get_posts_list(['page']),
+                'list_entries' => 'leyka_get_pages_list',
             ],
             'donor_management_available' => [
                 'type' => 'checkbox',
                 'default' => false,
                 'title' => __('Donor management available', 'leyka'),
-                'comment' => __('Check to turn on the donors logging for all donations. It allows CRM functions and adds additional donors management pages to the plugin administation area.', 'leyka'),
+                'comment' => __("Check to turn on the donors logging for all donations. It allows CRM functions and adds additional donors management pages to the plugin administation area.", 'leyka'),
                 'short_format' => true,
             ],
             'donor_accounts_available' => [
@@ -224,13 +216,6 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'default' => true,
                 'title' => __("On each donor's action, check if its submit request is unique", 'leyka'),
                 'comment' => __('WARNING: unchecking this option may compromise yor website security. Unckeck it ONLY if your website uses caching plugins, and your donors systematically encounter nonce check errors while trying to submit a donation.', 'leyka'),
-                'short_format' => true,
-            ],
-            'campaign_categories_available' => [
-                'type' => 'checkbox',
-                'default' => false,
-                'title' => __('Campaigns categories available', 'leyka'),
-                'comment' => __('Check to turn on the campaigns categories taxonomy. Categories will be available both in the admin and public website areas.', 'leyka'),
                 'short_format' => true,
             ],
         ];
@@ -355,65 +340,43 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
 
     protected function _get_meta_payments() {
 
-        $currencies = leyka_get_main_currencies_full_info();
+        $main_currency_id = leyka_get_country_currency();
+        $main_currencies = leyka_get_main_currencies_full_info();
 
-        if(empty($currencies)) {
+        if(empty($main_currencies[$main_currency_id])) {
             return [];
         }
 
         $options = [
-            'payments_single_tab_title' => [
+            "payments_single_tab_title" => [
                 'type' => 'text',
-                'default' => __('Single payments', 'leyka'),
+                'default' => __('Single payments'),
                 'title' => __('Donation form tab title', 'leyka'),
                 'required' => true,
-                'placeholder' => __('Single payments', 'leyka'),
+                'placeholder' => __('Single payments')
             ],
-            'payments_single_amounts_options' => [
-                'type' => 'custom_payments_amounts_options_tabs',
-                'title' => __('Amounts options tabs', 'leyka'),
-                'field_classes' => ['payments-amounts-options-tab'],
+            "payments_single_amounts_options_".$main_currency_id => [
+                'type' => 'custom_payments_amounts_options',
+                'title' => __('Amounts options', 'leyka'),
+                'field_classes' => ['payments-amounts-options'],
                 'default' => [],
                 'payment_type' => 'single'
             ],
-            'payments_recurring_tab_title' => [
+            "payments_recurring_tab_title" => [
                 'type' => 'text',
-                'default' => __('Recurring payments', 'leyka'),
+                'default' => __('Recurring payments'),
                 'title' => __('Donation form tab title', 'leyka'),
                 'required' => true,
-                'placeholder' => __('Recurring payments', 'leyka'),
+                'placeholder' => __('Recurring payments')
             ],
-            'payments_recurring_amounts_options' => [
-                'type' => 'custom_payments_amounts_options_tabs',
-                'title' => __('Amounts options tabs', 'leyka'),
-                'field_classes' => ['payments-amounts-options-tab'],
+            "payments_recurring_amounts_options_".$main_currency_id => [
+                'type' => 'custom_payments_amounts_options',
+                'title' => __('Amounts options', 'leyka'),
+                'field_classes' => ['payments-amounts-options'],
                 'default' => [],
                 'payment_type' => 'recurring'
             ]
-
         ];
-
-        foreach($currencies as $currency_id => $currency_data) {
-
-            $options['payments_single_amounts_options_'.$currency_id] = [
-                'type' => 'custom_payments_amounts_options',
-                'title' => __('Amounts options', 'leyka'),
-                'field_classes' => ['payments-amounts-options'],
-                'default' => [],
-                'payment_type' => 'single',
-                'currency_id' => $currency_id
-            ];
-
-            $options['payments_recurring_amounts_options_'.$currency_id] = [
-                'type' => 'custom_payments_amounts_options',
-                'title' => __('Amounts options', 'leyka'),
-                'field_classes' => ['payments-amounts-options'],
-                'default' => [],
-                'payment_type' => 'recurring',
-                'currency_id' => $currency_id
-            ];
-
-        }
 
         return $options;
 
@@ -424,29 +387,29 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
         $currencies_options_meta = [
             'currency_main' => [
                 'type' => 'select',
-                'default' => 'rub',
+                'default' => leyka_get_country_currency(),
                 'title' => __('The main currency', 'leyka'),
                 'required' => true,
                 'description' => __("Select the main currency of your donations. Most of the times it's going to be the official currency of your country.", 'leyka'),
                 'list_entries' => leyka_get_currencies_list(),
             ],
-            'currencies_rates_auto_refresh' => [
-                'type' => 'checkbox',
-                'default' => '1',
-                'title' => __('Automatically refresh currency rates', 'leyka'),
-                'comment' => __('Check to allow auto-refresh of currency rates. This feature will require a cron job created on your server. Rates data will be taken from https://api.exchangerate.host website.', 'leyka'),
-                'short_format' => true
-            ],
-            'currencies_miscs' => [
-                'type' => 'custom_currencies_miscs_tabs',
-                'title' => '',
-                'field_classes' => ['currencies-miscs-tabs']
-            ]
+//            'auto_refresh_currency_rates' => [
+//                'type' => 'checkbox',
+//                'default' => '1',
+//                'title' => __('Automatically refresh currency rates', 'leyka'),
+//                'description' => __('Check to enable auto-refresh of currency rates. It will be performed every 24 hours and will require connection with http://cbr.ru website.', 'leyka'),
+//            ],
+//            'currency_rur2usd' => [
+//                'type' => 'number',
+//                'title' => __('Exchange rate', 'leyka'),
+//                'description' => __('Please set the RUB to USD currency rate here.', 'leyka'),
+//                'required' => true,
+//                'placeholder' => __('Enter rate value (e.g., 70)', 'leyka'),
+//                'length' => 6,
+//            ],
         ];
 
-        $currencies_defaults = leyka_get_main_currencies_full_info();
-        $main_currency_id = leyka_get_main_currency();
-
+        $currencies_defaults = leyka_get_main_currencies_full_info() + leyka_get_secondary_currencies_full_info();
         foreach($currencies_defaults as $currency_id => $data) {
 
             $currencies_options_meta = $currencies_options_meta + [
@@ -495,41 +458,11 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                     'placeholder' => sprintf(__('E.g., %s', 'leyka'), $data['fixed_amounts']),
                     'length' => 75,
                 ],
-                "currency_{$currency_id}_exchange_rate" => [
-                    'type' => 'number',
-                    'default' => 1,
-                    'title' => strtoupper($main_currency_id.'-'.$currency_id),
-                    'placeholder' => __('Enter rate value (e.g., 70)', 'leyka'),
-                    'comment' => sprintf(__('%s to %s exchange rate.', 'leyka'),  strtoupper($main_currency_id), strtoupper($currency_id)),
-                    'required' => true,
-                    'length' => 9,
-                    'step' => '0.000000001'
-                ],
             ];
 
         }
 
         return $currencies_options_meta;
-
-    }
-
-    protected function _get_meta_cryptocurrencies() {
-
-        return [
-            'cryptocurrencies_text' => [
-                'title' => '',
-                'type' => 'rich_html',
-                'default' => __('<b>We also accept donations in cryptocurrencies</b>', 'leyka'),
-                'field_classes' => ['type-rich_html'],
-                'short_format' => true
-            ],
-            'cryptocurrencies_wallets' => [
-                'title' => '',
-                'type' => 'custom_cryptocurrencies_wallets_options',
-                'field_classes' => ['cryptocurrencies-wallets-options'],
-                'default' => []
-            ]
-        ];
 
     }
 
@@ -635,7 +568,7 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'type' => 'text',
                 'default' => __('Thank you for your donation!', 'leyka'),
                 'title' => __('A title of after-donation notice sended to a donor', 'leyka'),
-                //'comment' => __('A title of the notification (or thankful) email with donation data that would be sended to each donor right after his donation is made.', 'leyka'),
+                'comment' => __('A title of the notification (or thankful) email with donation data that would be sended to each donor right after his donation is made.', 'leyka'),
                 'required' => true,
                 'placeholder' => sprintf(__('E.g., %s', 'leyka'), __('Daisy Foundation thanks you for your kindness', 'leyka')),
             ],
@@ -643,7 +576,7 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'type' => 'rich_html',
                 'default' => __('Hello, #DONOR_NAME#!<br><br>You made a #SUM# donation to the following charity campaign: #CAMPAIGN_NAME#, using #PAYMENT_METHOD_NAME#.<br><br>Sincerely thank you,<br>#ORG_NAME#', 'leyka'),
                 'title' => __('Email text', 'leyka'),
-                //'comment' => __('An email text that your donor will see. You may use the special tags in the text.', 'leyka'),
+                'comment' => __('An email text that your donor will see. You may use the special tags in the text.', 'leyka'),
                 'description' => $email_placeholders,
                 'required' => true,
                 'field_classes' => ['type-rich_html'],
@@ -1165,7 +1098,7 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'default' => leyka_get_default_service_terms_page(),
                 'title' => __("Page of terms of service text", 'leyka'),
                 'description' => __('Select a page with terms of the donation service full text.', 'leyka'),
-                'list_entries' => leyka_get_posts_list(['page']),
+                'list_entries' => 'leyka_get_pages_list',
             ],
             'agree_to_terms_link_action' => [
                 'type' => 'radio',
@@ -1222,7 +1155,7 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'default' => leyka_get_default_pd_terms_page(),
                 'title' => __("Page of personal data usage terms and policy", 'leyka'),
                 'description' => __('Select a page with personal data usage terms and policy full text.', 'leyka'),
-                'list_entries' => leyka_get_posts_list(['page']),
+                'list_entries' => 'leyka_get_pages_list',
             ],
             'agree_to_pd_terms_link_action' => [
                 'type' => 'radio',
@@ -1313,13 +1246,6 @@ abstract class Leyka_Options_Meta_Controller extends Leyka_Singleton {
                 'default' => true,
                 'title' => __('Add platform signature to donation form', 'leyka'),
                 'short_format' => true
-            ],
-            'object_caching_compatibility_mode' => [
-                'type' => 'checkbox',
-                'default' => false,
-                'title' => __('Object caching compatibility mode on', 'leyka'),
-                'comment' => __('Check if you have problems with donations statuses works when object caching is active (i.e., Redis, Memcached, etc.).', 'leyka'),
-                'short_format' => true,
             ],
         ];
     }

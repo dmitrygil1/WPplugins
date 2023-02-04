@@ -23,11 +23,6 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
             $this->_export();
         }
 
-        if( !empty($_GET['subscriptions-update-all-statuses']) ) {
-            leyka_update_recurring_subscriptions_statuses(true);
-            unset($_GET['subscriptions-update-all-statuses']);
-        }
-
     }
 
     /**
@@ -40,20 +35,14 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
     public function filter_items(array $params, $filter_type = '') {
 
         $params['recurring_only_init'] = true;
-        $params['status'] = ['funded'];
+        $params['status'] = 'funded';
 
-        if( !empty($_GET['get-params']) ) {
-            parse_str($_GET['get-params'], $_GET);
+        if( !empty($_GET['status']) ) {
+            $params['recurring_active'] = $_GET['status'] === 'active';
         }
-
-        if( !empty($_GET['recurring_subscription_status']) ) {
-            $params['recurring_subscription_status'] = $_GET['recurring_subscription_status'];
-        }
-
         if( !empty($_GET['donor-name-email']) ) {
             $params['donor_name_email'] = $_GET['donor-name-email'];
         }
-
         if( !empty($_GET['campaigns']) ) {
             if(is_array($_GET['campaigns'])) {
                 $params['campaign_id'] = array_filter($_GET['campaigns'], function($value){ return absint($value); });
@@ -92,12 +81,6 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
 
         if( !empty($_GET['gateway']) ) {
             $params['gateway_id'] = $_GET['gateway'];
-        }
-
-        if( !empty($_GET['day']) ) {
-            if(abs((int)$_GET['day']) > 0 && abs((int)$_GET['day']) < 31) {
-                $params['day'] = abs((int)$_GET['day']);
-            }
         }
 
         if($filter_type) { // If filter type is set, the filtering is not just to get items from DB - so ordering won't be needed
@@ -140,10 +123,20 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
         $items_data = [];
         foreach($init_recurring_donations as $init_donation) {
 
+            $subscription_day_num = (int)date('j', $init_donation->date_timestamp);
+            $next_donation_timestamp = $subscription_day_num > (int)date('j') ?
+                strtotime(date('d', $init_donation->date_timestamp).'.'.date('m.Y')) : // Current month, closest date
+                strtotime('+1 month', $init_donation->date_timestamp); // Next month
+
+            /** @todo Add funded rebills number caching to the init recurring Donations! This query is in DIRE need of optimization. */
+            $donations_number = Leyka_Donations::get_instance()->get_count([
+                'status' => 'funded',
+                'recurring_rebills_of' => $init_donation->id,
+            ]);
+
             $item = [
                 'id' => $init_donation->id,
-                'recurring_subscription_status' => $init_donation->recurring_subscription_status,
-                'recurring_subscription_error_id' => $init_donation->recurring_subscription_error_id,
+                'status' => $init_donation->recurring_on,
                 'donor' => [
                     'id' => $init_donation->donor_id,
                     'name' => $init_donation->donor_name,
@@ -154,8 +147,8 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
                     'title' => $init_donation->campaign_title,
                 ],
                 'first_donation' => $init_donation,
-                'next_donation' => $init_donation->next_recurring_date_timestamp,
-                'donations_number' => $init_donation->successful_rebills_number + 1, // Init donation included
+                'next_donation' => $next_donation_timestamp,
+                'donations_number' => $donations_number + 1, // Init donation included
                 'gateway_pm' => $init_donation->pm_full_id,
                 'amount' => $init_donation->amount,
                 'amount_formatted' => $init_donation->amount_formatted,
@@ -197,30 +190,30 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
      * @return array
      */
     function get_columns() {
-        return apply_filters('leyka_admin_recurring_subscriptions_list_columns', [
+        return [
             'donation_id' => __('ID'),
-            'campaign' => __('Campaign', 'leyka'),
+            'status' => __('Status', 'leyka'),
             'donor' => __('Donor', 'leyka'),
-            'first_donation' => __('First payment', 'leyka'),
-            'next_donation' => _x('Next', 'Recurring subscriptions list page: table column', 'leyka'),
-            'donations_number' => __('Payments total', 'leyka'),
+            'campaign' => __('Campaign', 'leyka'),
+            'first_donation' => __('First donation', 'leyka'),
+            'next_donation' => __('Next donation', 'leyka'),
+            'donations_number' => __('Donations total', 'leyka'),
+            'gateway_pm' => __('Gateway', 'leyka'),
             'amount' => __('Amount', 'leyka'),
-            'gateway_pm' => _x('Method', 'Recurring subscriptions list page: table column', 'leyka')
-        ]);
+        ];
     }
 
     /**
      * @return array
      */
     public function get_sortable_columns() {
-        return apply_filters('leyka_admin_recurring_subscriptions_list_sortable_columns', [
+        return [
             'donation_id' => ['donation_id', true],
-            'donor' => ['donor_name', false],
+            'status' => ['status', true],
+            'donor' => ['donor', false],
             'first_donation' => ['first_donation', true],
-            'donations_number' => ['donations_number', true],
             'amount' => ['amount', true],
-            'gateway_pm' => ['gateway_pm', true]
-        ]);
+        ];
     }
 
     /**
@@ -232,134 +225,95 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
      */
     public function column_default($item, $column_name) {
         switch ($column_name) {
-            case 'donation_id':
-
-                if($item['recurring_subscription_status'] === 'problematic') {
-
-                    if(in_array($item['recurring_subscription_error_id'], ['L-2001', 'L-1023'])) {
-
-                        $recurring_error = Leyka_Donations_Errors::get_instance()->get_error_by_id($item['recurring_subscription_error_id']);
-                        $recurring_error_subscription = __($recurring_error->description, 'leyka');
-                        $recurring_error_link_label = __('To the subscription page', 'leyka');
-                        $recurring_error_link = admin_url('?page=leyka_recurring_subscription_info&donation='.$item['id']);
-
-                    } else {
-
-                        $recurring_error_subscription = __('The last attempt to make a donation by this subscription ended with an error. Please check the error description and the fixing recommendations on the donation page.', 'leyka');
-                        $subscription_last_payment = Leyka_Donations::get_instance()->get([
-                            'recurring_rebills_of' => $item['id'],
-                            'get_single' => true,
-                            'orderby' => ['date_timestamp' => 'DESC']
-                        ]);
-                        $recurring_error_link_label = __('To the donation page', 'leyka');
-                        $recurring_error_link = admin_url('?page=leyka_donation_info&donation='.$subscription_last_payment->id);
-
-                    }
-
-                }
-
-                $content = '<div class="leyka-content-wrapper">
-                    <span>'.$item['id'].'</span>
-                    <a href="'.admin_url('admin.php?page=leyka_recurring_subscription_info&donation='.$item['id']).'" class="donation-edit-link">'.__('Details', 'leyka').'</a>
-                    <span class="leyka-'.($item['recurring_subscription_status']).'">'
-                        ._x(ucfirst($item['recurring_subscription_status']), 'Recurring subscription status, singular (like [subscription is] "Active/Non-active/Problematic")', 'leyka') /** @todo Fix this ambiguous l10n string formulation! */
-                    .'</span>'.
-                    ($item['recurring_subscription_status'] !== 'problematic' ? '' : '<div class="problematic-subscription-alert leyka-subscription-error leyka-hidden">
-                        <img class="leyka-button-close" src="'.LEYKA_PLUGIN_BASE_URL.'img/star-icon-close.svg">
-                        <div class="leyka-error-title">
-                            <img src="'.LEYKA_PLUGIN_BASE_URL.'img/icon-alert-red.svg">
-                            <span>'.__('Problematic subscription', 'leyka').'</span>
-                        </div>
-                        <div class="leyka-error-description-wrapper">
-                            <div class="leyka-error-description">'.$recurring_error_subscription.'</div>
-                            <a class="leyka-error-link" href="'.$recurring_error_link.'">'.$recurring_error_link_label.'</a>
-                            <div class="leyka-button-ok">'._x('OK','Problematic subscription alert OK button', 'leyka').'</div>
-                        </div>
-                    </div>').'
-                </div>';
-
-                return apply_filters('leyka_admin_recurring_subscription_donation_id_column_content', $content, $item['first_donation']);
-
+            case 'donation_id': return $item['id'];
             default: // Show the whole item array for troubleshooting purposes
-                return apply_filters("leyka_admin_recurring_subscription_{$column_name}_column_content", '', $item);
+                return leyka_options()->opt('plugin_debug_mode') ?
+                    '<pre>'.print_r($item, true).'</pre>' : // Show the whole array for troubleshooting purposes
+                    apply_filters("leyka_admin_recurring_subscription_{$column_name}_column_content", '', $item);
         }
+    }
+
+    public function column_status($item) {
+
+        if(empty($item['status'])) {
+            $html = '<i class="icon-leyka-recurring-subscription-status icon-recurring-subscription-not-active has-tooltip leyka-tooltip-align-left" title="'.__("The recurring subscription isn't active, it's regular donations are stopped.", 'leyka').'"></i>';
+        } else {
+            $html = '<i class="icon-leyka-recurring-subscription-status icon-recurring-subscription-active has-tooltip leyka-tooltip-align-left" title="'.__("The recurring subscription is active, it's regular donations are going to be rebilled monthly as normal.", 'leyka').'"></i>';
+        }
+
+        return apply_filters('leyka_admin_recurring_subscription_status_column_content', $html, $item);
+
     }
 
     public function column_donor($item) {
 
-        $donation = Leyka_Donations::get_instance()->get_donation($item['id']);
-        $donor_phone = leyka_get_donor_phone($donation);
+        if(empty($item['donor']['id'])) {
+            $donor_name = $item['donor']['name'];
+        } else {
+
+            try {
+
+                $donor = new Leyka_Donor($item['donor']['id']);
+
+                $donor_name = '<a href="'.admin_url('?page=leyka_donor_info&donor='.$item['donor']['id']).'">'
+                    .$donor->name.'</a>';
+
+            } catch(Exception $exception) {
+                $donor_name = $item['donor']['name'];
+            }
+
+        }
 
         $donor_data_html = apply_filters(
             'leyka_admin_recurring_subscription_donor_column_content',
             '<div class="donor-name">'
-                .(leyka_options()->opt('donor_management_available') && $donation->donor_id ? '<a href="'.admin_url('admin.php?page=leyka_donor_info&donor='.$donation->donor_id).'">' : '')
-                .$donation->donor_name
+                .(leyka_options()->opt('donor_management_available') && $item['donor']['id'] ? '<a href="'.admin_url('?page=leyka_donor_info&donor='.$item['donor']['id']).'">' : '')
+                .$donor_name
                 .(leyka_options()->opt('donor_management_available') ? '</a>' : '')
             .'</div>'
-            .'<div class="donor-additional-data donor-email">'.$donation->donor_email.'</div>'
-            .($donor_phone ? '<div class="donor-additional-data donor-phone">'.$donor_phone.'</div>' : ''),
-            $donation
+            .'<div class="donor-email">'.$item['donor']['email'].'</div>',
+            $item
         );
 
-        $donor_additional_data_html = '<ul>';
+        $additional_data_html = '<ul>'
+            .'<li>
+        <span class="leyka-li-title">'.__('Recurring is active', 'leyka').':</span>
+        <span class="leyka-li-value">'.($item['first_donation']->recurring_active ? __('yes', 'leyka') : __('no', 'leyka')).'</span>
+    </li>';
 
-        if($donation->payment_type === 'rebill') {
-            $donor_additional_data_html .= '<li>
-                <span class="leyka-li-title">'.__('Recurring is active', 'leyka').':</span>
-                <span class="leyka-li-value">'.($donation->recurring_active ? __('yes', 'leyka') : __('no', 'leyka')).'</span>
-            </li>';
-        }
+        $additional_data_html .= '<li>
+        <span class="leyka-li-title">'._x('Subscription', "[Donor's email subscription. Should be short]", 'leyka').':</span>
+        <span class="leyka-li-value">'.($item['first_donation']->donor_subscribed ? __('yes', 'leyka') : __('no', 'leyka')).'</span>
+    </li>
 
-        $donor_additional_data_html .= '<li>
-                <span class="leyka-li-title">'.__('Email', 'leyka').':</span>
-                <span class="leyka-li-value">'.($donation->donor_email_date ? sprintf(__('Sent on %s', 'leyka'), date(get_option('date_format').', H:i</time>', $donation->donor_email_date)) : __('no', 'leyka')).'</span>
-            </li>
-        
-            <li>
-                <span class="leyka-li-title">'.__('Email subscription', 'leyka').':</span>
-                <span class="leyka-li-value">'.($donation->donor_subscribed ? __('yes', 'leyka') : __('no', 'leyka')).'</span>
-            </li>
-        
-            <li>
-                <span class="leyka-li-title">'._x('Comment', "Donor's comment. Should be short.", 'leyka').':</span>
-                <span class="leyka-li-value">'.($donation->donor_comment ? mb_ucfirst($donation->donor_comment) : __('no', 'leyka')).'</span>
-            </li>';
-        $donor_additional_data_html = apply_filters(
-            'leyka_admin_donation_donor_column_additional_data_list_content_html',
-            $donor_additional_data_html,
-            $donation
-        );
-        $donor_additional_data_html .= '</ul>';
+    <li>
+        <span class="leyka-li-title">'._x('Comment', "[Donor's comment. Should be short]", 'leyka').':</span>
+        <span class="leyka-li-value">'.($item['first_donation']->donor_comment ? $item['first_donation']->donor_comment : __('no', 'leyka')).'</span>
+    </li>';
+        $additional_data_html .= '</ul>';
 
-        return '<div class="leyka-donor-data-cell-wrapper">
-                <div class="leyka-donor-data-additional">
-                    <i class="icon-donor-more-data has-tooltip leyka-tooltip-on-click leyka-tooltip-wide leyka-tooltip-white" data-tooltip-additional-classes="leyka-admin-tooltip-donor-more-data"></i>
-                    <span class="leyka-tooltip-content">'
-                        .apply_filters(
-                            'leyka_admin_recurring_subscription_donor_column_additional_data',
-                            $donor_additional_data_html,
-                            $item
-                        )
-                    .'</span>
-                </div>
-                <div class="leyka-donor-data-main">'.$donor_data_html.'</div>
-            </div>';
+        return '<div class="leyka-donor-data-additional">'
+                .'<i class="icon-donor-more-data has-tooltip leyka-tooltip-on-click leyka-tooltip-wide leyka-tooltip-white" data-tooltip-additional-classes="leyka-admin-tooltip-donor-more-data"></i>'
+                .'<span class="leyka-tooltip-content">'
+                    .apply_filters('leyka_admin_recurring_subscription_donor_column_additional_data', $additional_data_html, $item)
+                .'</span>'
+            .'</div>'
+            .'<div class="leyka-donor-data-main">'.$donor_data_html.'</div>';
 
     }
 
     public function column_campaign($item) {
 
-        $campaign_title_stripped = leyka_strip_string_by_words($item['campaign']['title'], 30);
-        $is_title_stripped = $campaign_title_stripped !== $item['campaign']['title'];
+        $column_content = '<div class="donation-campaign">
+        <a href="'.Leyka_Donation_Management::get_donation_edit_link($item['first_donation']).'">'.$item['campaign']['title'].'</a>
+    </div>'
+            .$this->row_actions([
+                'donation_page' => '<a href="'.Leyka_Donation_Management::get_donation_edit_link($item['first_donation']).'">'.__('Edit the recurring subscription', 'leyka').'</a>',
+                'campaign_page' => '<a href="'.admin_url('post.php?post='.$item['campaign']['id'].'&action=edit').'">'.__('Edit the campaign', 'leyka').'</a>',
+//                'delete' => '<a href="'.Leyka_Donation_Management::get_donation_delete_link($donation).'">'.__('Delete').'</a>',
+            ]);
 
-        $content = '<div class="donation-campaign '.($is_title_stripped ? 'has-tooltip' : '').'" '.($is_title_stripped ? 'title="'.esc_attr($item['campaign']['title']).'"' : '').'>
-                <a href="'.admin_url('post.php?post='.$item['campaign']['id'].'&action=edit').'">'
-            .($is_title_stripped ? $campaign_title_stripped.'&nbsp;&mldr;' : $item['campaign']['title'])
-            .'</a>
-            </div>';
-
-        return apply_filters('leyka_admin_recurring_subscription_campaign_column_content', $content, $item);
+        return apply_filters('leyka_admin_recurring_subscription_campaign_column_content', $column_content, $item);
 
     }
 
@@ -371,7 +325,7 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
 
         return apply_filters(
             'leyka_admin_recurring_subscription_first_donation_column_content',
-            $item['first_donation']->date_label.'<br>'.$item['first_donation']->time_label.'<a href="'.admin_url('admin.php?page=leyka_donation_info&donation='.$item['first_donation']->id).'"><img src="'.LEYKA_PLUGIN_BASE_URL.'/img/icon-arrow-left.svg"></a>',
+            $item['first_donation']->date_label.'<br>'.$item['first_donation']->time_label,
             $item
         );
 
@@ -381,13 +335,30 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
 
         if(empty($item['next_donation'])) {
             return '';
-        } else if($item['recurring_subscription_status'] === 'non-active') {
+        } else if(empty($item['status'])) {
             return '<span class="leyka-recurring-not-active">'.__('The subscription is not active', 'leyka').'</span>';
+        }
+
+        $subscription = $item['first_donation'];
+
+        $subscription_day_num = (int)date('j', $subscription->date_timestamp);
+        $current_month_max_day = (int)date('t');
+        $next_month_max_day = (int)date('t', strtotime('01.'.date('m.Y').' +1 month'));
+        $current_day = (int)date('j');
+
+        if($subscription_day_num > $current_day) { // Current month, closest day
+            $next_donation_timestamp = $subscription_day_num >= $current_month_max_day ? // Current month is too short?
+                strtotime($current_month_max_day.'.'.date('m.Y')) : // Last day of current month
+                strtotime(date('d', $subscription->date_timestamp).'.'.date('m.Y')); // Current month, closest day
+        } else { // Next month
+            $next_donation_timestamp = $subscription_day_num >= $next_month_max_day ? // Next month is too short?
+                strtotime($next_month_max_day.'.'.date('m.Y')) : // Last day of next month
+                strtotime(date('d', $subscription->date_timestamp).'.'.date('m.Y').' +1 month'); // Next month, same day
         }
 
         return apply_filters(
             'leyka_admin_recurring_subscription_next_donation_column_content',
-            date(get_option('date_format'), $item['next_donation']),
+            date(get_option('date_format'), $next_donation_timestamp),
             $item
         );
 
@@ -407,29 +378,21 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
      */
     public function column_gateway_pm($item) {
 
-        $donation = Leyka_Donations::get_instance()->get_donation($item['id']);
+        if(empty($item['gateway_pm'])) {
+            return '';
+        }
 
-        $gateway = $donation->gateway_id ? leyka_get_gateway_by_id($donation->gateway_id) : false;
-        $pm = $donation->gateway_id && $donation->gateway_id !== 'correction' ?
-            leyka_get_pm_by_id($donation->pm_full_id, true) : $donation->pm_id;
-
-        $gateway_label = $donation->gateway_id && $donation->gateway_id !== 'correction' ?
-            $gateway->label : __('Custom payment info', 'leyka');
-        $pm_label = is_a($pm, 'Leyka_Payment_Method') ? $donation->pm_label : $donation->pm;
+        $pm = leyka_get_pm_by_id($item['gateway_pm'], true);
+        $gateway = leyka_get_gateway_by_id($pm->gateway_id);
 
         return apply_filters(
             'leyka_admin_recurring_subscription_gateway_pm_column_content',
-            "<span class='leyka-gateway-pm has-tooltip leyka-tooltip-align-left' title='".$gateway_label.' / '.$pm_label."'>
-                <div class='leyka-gateway-name'>"
-            .($gateway ?
-                '<img src="'.$gateway->icon_url.'" alt="'.$gateway_label.'">' :
-                '<img src="'.LEYKA_PLUGIN_BASE_URL.'/img/pm-icons/custom-payment-info.svg" alt="'.$pm.'">')
-            ."</div>
-                <div class='leyka-pm-name'>"
-            .(is_a($pm, 'Leyka_Payment_Method') ? "<img src='".$pm->admin_icon_url."' alt='$pm_label'>" : '')
-            ."</div>
-            </span>",
-            $donation
+            "<div class='leyka-gateway-name'>"
+                .($gateway ? "<img src='".$gateway->icon_url."' alt='{$gateway->label}'>" : '')
+                ."$gateway->label,
+            </div>
+            <div class='leyka-pm-name'>$pm->label</div>",
+            $item
         );
 
     }
@@ -440,51 +403,22 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
      */
     public function column_amount($item) {
 
-        $amount = $item['amount'] == $item['first_donation']->amount_total ?
+        $amount_html = $item['amount'] == $item['first_donation']->amount_total ?
             $item['amount_formatted'].'&nbsp;'.$item['first_donation']->currency_label :
             $item['amount_formatted'].'&nbsp;'.$item['first_donation']->currency_label
-            .'<div class="amount-total">'
-            .$item['first_donation']->amount_total_formatted.'&nbsp;'.$item['first_donation']->currency_label
-            .'</div>';
+            .'<span class="amount-total"> / '
+                .$item['first_donation']->amount_total_formatted.'&nbsp;'.$item['first_donation']->currency_label
+            .'</span>';
 
-        $donation = Leyka_Donations::get_instance()->get_donation($item['id']);
-
-        /* if($donation->status === 'failed') {
-
-            $error = $donation->error;
-            $error = is_a($error, 'Leyka_Donation_Error') ?
-                $error : Leyka_Donations_Errors::get_instance()->get_error_by_id(false);
-
-            $tooltip_content = '<strong>'.sprintf(__('Error %s', 'leyka'), $error->id).'</strong>: '.mb_lcfirst($error->name)
-                .'<p><a class="leyka-tooltip-error-content-more leyka-inner-tooltip leyka-tooltip-x-wide leyka-tooltip-white" title="" href="#">'
-                .__('More info', 'leyka')
-                .'</a></p>'
-                .'<div class="error-full-info-tooltip-content">'.leyka_show_donation_error_full_info($error, true).'</div>';
-
-        } else {
-            $tooltip_content = '<strong>'.$donation->status_label.':</strong> '.mb_lcfirst($donation->status_description);
-        } */
-
-        $column_content = '<span class="leyka-amount '.apply_filters('leyka_admin_recurring_subscription_amount_column_css', ($donation->amount < 0.0 ? 'leyka-amount-negative' : '')).'">'
+        $column_content = '<span class="leyka-amount '.apply_filters('leyka_admin_recurring_subscription_amount_column_css', '', $item).'">'
+//            .'<i class="icon-leyka-donation-status icon-'.$donation->status.' has-tooltip leyka-tooltip-align-left" title="'.$donation->status_description.'"></i>'
             .'<span class="leyka-amount-and-status">'
-            .'<div class="leyka-amount-itself" title="">'
-            .$amount
-            .'</div>'
-            .'</span>'
-            /* .'<div class="leyka-donation-status-label label-'.$donation->status.' has-tooltip leyka-tooltip-align-left leyka-tooltip-on-click" title="">'
-            .__(Leyka::get_donation_status_info($donation->status, 'short_label'), 'leyka')
-            .'</div>'
-            .'<span class="leyka-tooltip-content">'
-            .apply_filters(
-                'leyka_admin_recurring_subscriptions_list_donation_status_tooltip_content',
-                $tooltip_content,
-                $item
-            )
-            .'</span>'
-            .'</span>' */
-            ;
+                .'<div class="leyka-amount-itself">'.$amount_html.'</div>'
+//                .'<div class="leyka-donation-status-label label-'.$donation->status.'">'.$donation->status_label.'</div>'
+            .'</span>
+        </span>';
 
-        return apply_filters('leyka_admin_recurring_subscription_amount_column_content', $column_content, $donation);
+        return apply_filters('leyka_admin_recurring_subscription_amount_column_content', $column_content, $item);
 
     }
 
@@ -508,90 +442,6 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
 
         $this->set_pagination_args(['total_items' => self::get_items_count(), 'per_page' => $per_page,]);
         $this->items = $this->_get_items($per_page, $this->get_pagenum());
-
-    }
-
-    protected function display_tablenav( $which ) {
-
-        if($which === 'top') {
-            wp_nonce_field('bulk-'.$this->_args['plural']);
-        }?>
-
-        <div class="leyka-admin-tablenav <?php echo esc_attr($which);?>">
-
-            <?php if($which === 'top') {
-
-                $subscriptions_statuses_list = leyka_get_recurring_subscription_status_list();
-                $subscriptions_stats['all'] = 0;
-
-                foreach(array_keys($subscriptions_statuses_list) as $status_id) {
-                    $subscriptions_stats[$status_id] = 0;
-                }
-
-                $params = apply_filters('leyka_admin_recurring_subscriptions_list_filter', []);
-                unset($params['recurring_subscription_status']);
-
-                $subscriptions = Leyka_Donations::get_instance()->get($params);
-
-                foreach($subscriptions as $subscription) {
-
-                    $subscriptions_stats['all']++;
-                    $subscriptions_stats[$subscription->recurring_subscription_status]++;
-
-                };
-
-                $filter_value = isset($_GET['recurring_subscription_status']) ?
-                    esc_attr($_GET['recurring_subscription_status']) : false;
-                $other_filters_values_string = '';
-
-                foreach($_GET as $param_name => $param_value) {
-
-                    if($param_name === 'first-date' && is_array($param_value)) {
-                        $param_value = $param_value[0].'-'.$param_value[1];
-                    }
-
-                    $other_filters_values_string .= $other_filters_values_string === '' ? '' : '&';
-                    $other_filters_values_string .= in_array($param_name, ['recurring_subscription_status', 'paged']) ?
-                        '' : $param_name.'='.$param_value;
-
-                }?>
-
-                <div class="admin-list-filters leyka-filter-buttons">
-
-                        <a class="leyka-filter-button leyka-subscriptions-all <?php echo !$filter_value ? 'leyka-active' : ''; ?>" href="?<?php echo $other_filters_values_string; ?>">
-                            <?php echo __('All subscriptions', 'leyka').' ('.$subscriptions_stats['all'].')';?>
-                        </a>
-
-                        <a class="leyka-filter-button leyka-subscriptions-active <?php echo $filter_value == 'active' ? 'leyka-active' : '';?>" href="?<?php echo $other_filters_values_string; ?>&recurring_subscription_status=active">
-                            <?php echo _x('Only active', 'Multiple case', 'leyka').' ('.$subscriptions_stats['active'].')';?>
-                        </a>
-
-                        <a class="leyka-filter-button leyka-subscriptions-problematic <?php echo $filter_value == 'problematic' ? 'leyka-active' : '';?>" href="?<?php echo $other_filters_values_string; ?>&recurring_subscription_status=problematic">
-                            <?php echo _x('Only problematic', 'Multiple case', 'leyka').' ('.$subscriptions_stats['problematic'].')';?>
-                        </a>
-
-                        <a class="leyka-filter-button leyka-subscriptions-non-active <?php echo $filter_value == 'non-active' ? 'leyka-active' : '';?>" href="?<?php echo $other_filters_values_string; ?>&recurring_subscription_status=non-active">
-                            <?php echo _x('Only not active', 'Multiple case', 'leyka').' ('.$subscriptions_stats['non-active'].')';?>
-                        </a>
-
-                </div>
-
-                <?php $this->extra_tablenav($which);
-                $this->pagination($which);
-
-            } ?>
-
-        </div>
-
-        <?php
-
-    }
-
-    public function single_row($item) {
-
-        echo '<tr class="leyka-'.($item['recurring_subscription_status']).'">';
-        $this->single_row_columns($item);
-        echo '</tr>';
 
     }
 
@@ -637,7 +487,9 @@ class Leyka_Admin_Recurring_Subscriptions_List_Table extends WP_List_Table {
                 'leyka_recurring_subscriptions_export_line',
                 [
                     $item['id'],
-                    $item['recurring_subscription_status'],
+                    empty($item['status']) ?
+                        _x('not active', '[about recurring subscription]', 'leyka') :
+                        _x('active', '[about recurring subscription]', 'leyka'),
                     empty($item['donor']['name']) ? '' : $item['donor']['name'],
                     empty($item['donor']['email']) ? '' : $item['donor']['email'],
                     empty($item['campaign']['title']) ? 'Кампания #'.$item['campaign']['id'] : $item['campaign']['title'],
