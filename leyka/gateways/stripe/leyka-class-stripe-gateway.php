@@ -27,6 +27,7 @@ class Leyka_Stripe_Gateway extends Leyka_Gateway {
         $this->_min_commission = '2.2';
         $this->_receiver_types = ['legal'];
         $this->_may_support_recurring = true;
+        $this->_countries = ['eu'];
 
     }
 
@@ -111,7 +112,7 @@ class Leyka_Stripe_Gateway extends Leyka_Gateway {
             'line_items' => [[
                 'price_data' => [
                     'unit_amount' => 100*$form_data['leyka_donation_amount'],
-                    'currency' => $form_data['leyka_donation_currency'],
+                    'currency' => 'eur',
                     'product' => leyka_options()->opt('stripe_product_id')
                 ],
                 'quantity' => 1
@@ -342,8 +343,7 @@ class Leyka_Stripe_Gateway extends Leyka_Gateway {
                                 'init_recurring_donation' => $init_recurring_donation->id,
                                 'stripe_invoice_id' => $response_data->id,
                                 'stripe_payment_intent_id' => $response_data->payment_intent,
-                                'stripe_subscription_id' => $response_data->subscription,
-                                'date' => '' // don't copy the date
+                                'stripe_subscription_id' => $response_data->subscription
                             ],
                             ['recalculate_total_amount' => true]
                         );
@@ -442,10 +442,6 @@ class Leyka_Stripe_Gateway extends Leyka_Gateway {
 
             default:
                 break;
-        }
-
-        if($donation->type === 'rebill') {
-            do_action('leyka_new_rebill_donation_added', $donation);
         }
 
         exit(200);
@@ -677,7 +673,7 @@ class Leyka_Stripe_Card extends Leyka_Payment_Method {
             LEYKA_PLUGIN_BASE_URL.'img/pm-icons/card-mir.svg',
         ]);
 
-        $this->_supported_currencies = ['eur', 'usd', 'rub', 'uah', 'kgs'];
+        $this->_supported_currencies[] = 'eur';
         $this->_default_currency = 'eur';
 
     }

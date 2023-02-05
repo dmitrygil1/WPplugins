@@ -63,7 +63,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
         add_action('leyka_pre_help_actions', [$this, 'full_metaboxes_support']);
         add_action('leyka_pre_donor_info_actions', [$this, 'full_metaboxes_support']);
         add_action('leyka_pre_donation_info_actions', [$this, 'full_metaboxes_support']);
-        add_action('leyka_pre_recurring_subscription_info_actions', [$this, 'full_metaboxes_support']);
         add_action('leyka_pre_extension_settings_actions', [$this, 'full_metaboxes_support']);
 
         add_action('leyka_pre_donation_info_actions', [$this, 'handle_donation_info_submit']);
@@ -195,23 +194,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
 
                 }
 
-            } else if(isset($_GET['page']) && $_GET['page'] == 'leyka_recurring_subscription_info' && isset($_GET['donation'])) {
-
-                $donation = Leyka_Donations::get_instance()->get(absint($_GET['donation']));
-
-                if( !$donation ) {
-
-                    wp_redirect(admin_url('admin.php?page=leyka_donations'));
-                    exit;
-
-                } else if($donation->type !== 'rebill') {
-
-                    wp_redirect(admin_url('admin.php?page=leyka_donation_info&donation='.$donation->id));
-
-                }
-
-                $donation->update_recurring_subscription_status();
-
             }
 
             return $admin_title;
@@ -245,11 +227,10 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
         // Add donor account column to the admin Users list if needed:
         if(get_option('leyka_donor_management_available')) {
 
-            add_filter('manage_users_columns', function($columns){
+            add_filter('manage_users_columns', function($column){
 
-                $columns['donor_account_available'] = __("Donor's info", 'leyka');
-
-                return $columns;
+                $column['donor_account_available'] = __("Donor's info", 'leyka');
+                return $column;
 
             });
 
@@ -260,7 +241,7 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
                     if(leyka_user_has_role(Leyka_Donor::DONOR_USER_ROLE, false, $user_id)) {
 
                         $donor_user = new Leyka_Donor($user_id);
-                        $donor_info_page_link = '<a href="'.admin_url('admin.php?page=leyka_donor_info&donor='.$user_id).'">'.__('Info', 'leyka').'</a>';
+                        $donor_info_page_link = '<a href="'.admin_url('?page=leyka_donor_info&donor='.$user_id).'">'.__('Info', 'leyka').'</a>';
 
                         return ($donor_user->has_account_access ? __('yes', 'leyka') : __('no', 'leyka'))
                             .' | '.$donor_info_page_link;
@@ -272,43 +253,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
                 } else {
                     return $value;
                 }
-
-            }, 10, 3);
-
-        }
-
-        if(get_option('leyka_campaign_categories_available')) { // Fix for the Campaign categories admin list post count column
-
-            add_filter('manage_edit-'.Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME.'_columns', function($columns){
-
-                unset($columns['posts']);
-                $columns['campaigns'] = __('Campaigns', 'leyka');
-
-                return $columns;
-
-            });
-
-            add_filter(
-                'manage_'.Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME.'_custom_column',
-                function($content, $column_id, $campaign_category_id){
-
-                if($column_id === 'campaigns') {
-
-                    $category = get_term($campaign_category_id, Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME);
-
-                    $args = [
-                        'taxonomy' => Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME,
-                        'term' => $category->slug,
-                        'post_type' => Leyka_Campaign_Management::$post_type,
-                    ];
-
-                    $content = "<a href='".esc_url( add_query_arg( $args, 'edit.php'))."'>"
-                        .number_format_i18n( $category->count )
-                        ."</a>";
-
-                }
-
-                return $content;
 
             }, 10, 3);
 
@@ -332,14 +276,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
 
             $leyka_page_class .= 'leyka-admin-donation-info '
                 .(empty($_GET['donation']) ? 'leyka-donation-add' : 'leyka-donation-edit');
-
-        } else if( !empty($_GET['page']) && $_GET['page'] == 'leyka_recurring_subscription_info' ) {
-
-            $donation = Leyka_Donations::get_instance()->get($_GET['donation']);
-
-            $_GET['donation'] = $donation->is_init_recurring_donation ? $_GET['donation'] : $donation->init_recurring_donation_id;
-
-            $leyka_page_class .= 'leyka-admin-recurring-subscription-info ';
 
         } else if( !empty($_GET['page']) && $_GET['page'] == 'leyka_donors' && empty($_GET['screen']) ) {
             $leyka_page_class .= 'leyka-admin-donors-list';
@@ -383,38 +319,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
             'edit.php?post_type='.Leyka_Campaign_Management::$post_type
         );
 
-        if(leyka_options()->opt('campaign_categories_available')) {
-
-            // Campaigns categories page:
-            $taxonomy = get_taxonomy(Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME);
-
-            add_submenu_page(
-                'leyka',
-                esc_attr($taxonomy->labels->name),
-                esc_attr($taxonomy->labels->menu_name).'<a class="leyka-add-new dashicons dashicons-plus-alt" href="'.admin_url('/edit-tags.php?taxonomy='.Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME).'"></a>',
-                $taxonomy->cap->manage_terms,
-                'edit-tags.php?taxonomy='.$taxonomy->name
-            );
-
-            // Set the correct admin menu highlight for the Campaign categories admin list:
-            add_filter('parent_file', function($parent_file){
-
-                $screen = get_current_screen();
-
-                if(
-                    $screen
-                    && !empty($screen->taxonomy)
-                    && $screen->taxonomy === Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME
-                ) {
-                    $parent_file = 'leyka';
-                }
-
-                return $parent_file;
-
-            });
-
-        }
-
         // Donations admin list page:
         $hook = add_submenu_page(
             'leyka',
@@ -450,15 +354,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
             );
             add_action("load-$hook", [$this, 'donors_list_screen_options']);
 
-            add_submenu_page(
-                'leyka_donors',
-                __("Donor's info", 'leyka'),
-                __("Donor's info", 'leyka'),
-                'leyka_manage_options',
-                'leyka_donor_info',
-                [$this, 'donor_info_screen']
-            );
-
             // Donors tags page:
             $taxonomy = get_taxonomy(Leyka_Donor::DONORS_TAGS_TAXONOMY_NAME);
 
@@ -472,60 +367,18 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
 
         }
 
-        add_submenu_page(
-            'leyka',
-            __('Leyka Settings', 'leyka'),
-            __('Settings', 'leyka'),
-            'leyka_manage_options',
-            'leyka_settings',
-            [$this, 'settings_screen']
-        );
+        add_submenu_page('leyka', __('Leyka Settings', 'leyka'), __('Settings', 'leyka'), 'leyka_manage_options', 'leyka_settings', [$this, 'settings_screen']);
 
-        add_submenu_page(
-            'leyka',
-            __('Help', 'leyka'),
-            __('Help', 'leyka'),
-            'leyka_manage_donations',
-            'leyka_help',
-            [$this, 'help_screen']
-        );
+        add_submenu_page('leyka', __('Help', 'leyka'), __('Help', 'leyka'), 'leyka_manage_donations', 'leyka_help', [$this, 'help_screen']);
 
         // Fake pages:
-        add_submenu_page(
-            'leyka_donations',
-            __('New correctional donation', 'leyka'),
-            _x('Add new', '[donation]', 'leyka'),
-            'leyka_manage_donations',
-            'leyka_donation_info',
-            [$this, 'donation_info_screen']
-        );
+        add_submenu_page(NULL, __('New correctional donation', 'leyka'), _x('Add new', '[donation]', 'leyka'), 'leyka_manage_donations', 'leyka_donation_info', [$this, 'donation_info_screen']);
 
-        add_submenu_page(
-            'leyka_recurring_subscriptions',
-            __('Recurring subscription info', 'leyka'),
-            __('Recurring subscription info', 'leyka'),
-            'leyka_manage_donations', 
-            'leyka_recurring_subscription_info', 
-            [$this, 'recurring_subscription_info_screen']
-        );
+        add_submenu_page(NULL, 'Leyka Wizard', 'Leyka Wizard', 'leyka_manage_options', 'leyka_settings_new', [$this, 'settings_new_screen']);
 
-        add_submenu_page(
-            'leyka_settings',
-            __('Leyka Wizard', 'leyka'),
-            __('Leyka Wizard', 'leyka'),
-            'leyka_manage_options',
-            'leyka_settings_new',
-            [$this, 'settings_new_screen']
-        );
+        add_submenu_page(NULL, "Donor's info", "Donor's info", 'leyka_manage_options', 'leyka_donor_info', [$this, 'donor_info_screen']);
 
-        add_submenu_page(
-            'leyka_settings',
-            __('Extension settings', 'leyka'),
-            __('Extension settings', 'leyka'),
-            'leyka_manage_options',
-            'leyka_extension_settings',
-            [$this, 'leyka_extension_settings_screen']
-        );
+        add_submenu_page(NULL, 'Extension settings', 'Extension settings', 'leyka_manage_options', 'leyka_extension_settings', [$this, 'leyka_extension_settings_screen']);
 
         // Fake pages - END
 
@@ -563,12 +416,10 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
 		function leyka_dashboard_portlets_row_content($dashboard_row_id) {
 
 		    switch($dashboard_row_id) {
-                case 'donations-stats-main':
+                case 'donations-stats':
                     Leyka_Admin_Setup::get_instance()->show_admin_portlet(
                         'stats-donations-main', ['interval' => $_GET['interval'], 'reset' => isset($_GET['reset'])]
                     );
-                    break;
-                case 'donations-stats-recurring':
                     Leyka_Admin_Setup::get_instance()->show_admin_portlet(
                         'stats-recurring', ['interval' => $_GET['interval'], 'reset' => isset($_GET['reset'])]
                     );
@@ -731,8 +582,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
 
         } else { // Edit Donation page
 
-//            $donation = Leyka_Donations::get_instance()->get(absint($_GET['donation']));
-
             add_meta_box(
                 'leyka_donation_data',
                 __('Donation data', 'leyka'),
@@ -765,6 +614,20 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
                 'normal',
                 'low'
             );
+
+            $donation = Leyka_Donations::get_instance()->get(absint($_GET['donation']));
+            if($donation->is_init_recurring_donation) {
+
+                add_meta_box(
+                    'leyka_donation_recurring_subscription_rebills',
+                    __('Recurring donations of this subscription', 'leyka'),
+                    ['Leyka_Donation_Management', 'subscription_resurring_donations_metabox'],
+                    'dashboard_page_leyka_donation_info',
+                    'normal',
+                    'low'
+                );
+
+            }
 
         }
 
@@ -863,9 +726,9 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
 
         }
 
-        $donation_title = $campaign->payment_title ? :
-            ($campaign->title ? : sprintf(__('Donation #%s', 'leyka'), $donation->id));
-
+        $donation_title = $campaign->payment_title ?
+            $campaign->payment_title :
+            ($campaign->title ? $campaign->title : sprintf(__('Donation #%s', 'leyka'), $donation->id));
         if($donation->title !== $donation_title) {
             $donation->title = $donation_title;
         }
@@ -1000,35 +863,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
     }
     /** Donations related methods - END */
 
-    public function recurring_subscription_info_screen() {
-
-        do_action('leyka_pre_recurring_subscription_info_actions'); // Add collapsible to metaboxes
-
-        add_meta_box(
-            'leyka_donation_data',
-            __('Subscription data', 'leyka'),
-            ['Leyka_Donation_Management', 'subscription_data_metabox'],
-            'dashboard_page_leyka_donation_info',
-            'normal',
-            'high'
-        );
-
-        add_meta_box(
-            'leyka_donation_recurring_subscription_rebills',
-            __('Last donations', 'leyka'),
-            ['Leyka_Donation_Management', 'subscription_recurring_donations_metabox'],
-            'dashboard_page_leyka_donation_info',
-            'normal',
-            'low'
-        );
-
-        $this->_show_admin_template('recurring-subscription-info-page');
-
-        do_action('leyka_post_donation_info_actions');
-        do_action('leyka_post_admin_actions');
-
-    }
-
     /** Donors related methods: */
     public function donors_list_screen_options() {
 
@@ -1067,28 +901,28 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
             'leyka_donor_info',
             __("Donor's data", 'leyka'),
             [$this, 'donor_data_metabox'],
-            'admin_page_leyka_donor_info',
+            'dashboard_page_leyka_donor_info',
             'normal'
         );
         add_meta_box(
             'leyka_donor_admin_comments',
             __('Comments', 'leyka'),
             [$this, 'donor_comments_metabox'],
-            'admin_page_leyka_donor_info',
+            'dashboard_page_leyka_donor_info',
             'normal'
         );
         add_meta_box(
             'leyka_donor_tags',
             __('Tags'),
             [$this, 'donor_tags_metabox'],
-            'admin_page_leyka_donor_info',
+            'dashboard_page_leyka_donor_info',
             'normal'
         );
         add_meta_box(
             'leyka_donor_donations',
             __('Donations', 'leyka'),
             [$this, 'donor_donations_metabox'],
-            'admin_page_leyka_donor_info',
+            'dashboard_page_leyka_donor_info',
             'normal'
         );
 
@@ -1504,10 +1338,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
             'paginate_last' => __('Last', 'leyka'),
             'aria_sortAsc' => __(': activate to sort column ascending', 'leyka'),
             'aria_sortDesc' => __(': activate to sort column descending', 'leyka'),
-            'toPayment' => __('To payment', 'leyka'),
-            'sent' => __('Sent', 'leyka'),
-            'notSent' => __('Not sent', 'leyka'),
-            'sendItNow' => __('Send it now', 'leyka')
         ]);
 
         return 'jquery-dataTables';
@@ -1559,8 +1389,7 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
         $dependencies[] = 'jquery-ui-selectmenu';
         $dependencies[] = 'tags-box';
 
-        if(in_array($current_screen->id, ['admin_page_leyka_donation_info',
-            'admin_page_leyka_recurring_subscription_info', 'admin_page_leyka_donor_info',])) {
+        if(in_array($current_screen->id, ['admin_page_leyka_donation_info', 'dashboard_page_leyka_donor_info',])) {
             $dependencies[] = $this->_load_data_tables();
         }
 
@@ -1599,8 +1428,6 @@ class Leyka_Admin_Setup extends Leyka_Singleton {
             'extensions_list_page_url' => admin_url('admin.php?page=leyka_extensions'),
             'extension_colors_reset' => __('Reset settings', 'leyka'),
             'extension_colors_make_change' => __('Make changes', 'leyka'),
-            'copy2clipboard_text' => __('Copy to clipboard', 'leyka'),
-            'copied2clipboard_text' => __('Copied! :)', 'leyka'),
         ]);
 
         if(isset($_GET['page']) && $_GET['page'] === 'leyka') {

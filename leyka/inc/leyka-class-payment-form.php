@@ -172,19 +172,16 @@ class Leyka_Payment_Form {
 
 	}
 
-	public function get_recurring_field($campaign = null) {
+	public function get_recurring_field() {
 
         if( !$this->is_field_supported('recurring') ) {
             return '';
-        }
-        if($campaign) {
-            $is_recurring_campaign = $campaign->donations_type_default == 'recurring';
         }
 
         ob_start();?>
 
         <label class="checkbox leyka-recurring-field">
-            <input type="checkbox" class="leyka-recurring" name="leyka_recurring" value="1" <?php echo empty($is_recurring_campaign) ? '' : 'checked="checked"';?>>
+            <input type="checkbox" class="leyka-recurring" name="leyka_recurring" value="1">
             <span class="leyka-checkbox-label"><?php _e('Monthly donations', 'leyka');?></span>
         </label>
 
@@ -339,15 +336,12 @@ class Leyka_Payment_Form {
 
 	}
 
-	public function get_hidden_amount_fields($currency_id = null) {
+	public function get_hidden_amount_fields() {
 
         $hiddens = [];
-
-        $currencies = $currency_id ? [ $currency_id => leyka_get_currencies_data($currency_id)] : $this->get_supported_currencies();
-
-        foreach($currencies as $currency_id => $data) {
-            $hiddens[] = '<input type="hidden" name="top_' . esc_attr($currency_id) . '" value="' . esc_attr($data['top']) . '">
-            <input type="hidden" name="bottom_' . esc_attr($currency_id) . '" value="' . esc_attr($data['bottom']) . '">';
+        foreach($this->get_supported_currencies() as $currency_id => $data) {
+            $hiddens[] = '<input type="hidden" name="top_'.esc_attr($currency_id).'" value="'.esc_attr($data['top']).'">
+			              <input type="hidden" name="bottom_'.esc_attr($currency_id).'" value="'.esc_attr($data['bottom']).'">';
         }
 
         return implode("\n", $hiddens);
@@ -538,7 +532,7 @@ class Leyka_Payment_Form {
         return $this->_pm->description ? apply_filters('leyka_pm_description', $this->_pm->description, $this->_pm_name) : '';
 	}
 
-    public function get_supported_currencies($currency_id = null) {
+    public function get_supported_currencies() {
 
 		$supported_curr = $this->_pm ? $this->_pm->currencies : [leyka_options()->opt('currency_main')];
 		$active_curr = leyka_get_currencies_data();
@@ -736,13 +730,11 @@ function leyka_pf_get_hidden_fields($campaign = null, $include_common_fields = t
             .$leyka_current_pm->get_hidden_fields($campaign);
 }
 
-function leyka_pf_get_recurring_field($campaign = null) {
+function leyka_pf_get_recurring_field() {
     /** @var Leyka_Payment_Form $leyka_current_pm */
     global $leyka_current_pm;
 
-    $campaign = leyka_get_validated_campaign($campaign);
-
-    return $leyka_current_pm->get_recurring_field($campaign);
+    return $leyka_current_pm->get_recurring_field();
 
 }
 
@@ -763,7 +755,7 @@ function leyka_pf_get_amount_value() {
 }
 
 function leyka_pf_get_currency_value() {
-    return empty($_POST['leyka_donation_currency']) ? '' : strtolower($_POST['leyka_donation_currency']);
+    return empty($_POST['leyka_donation_currency']) ? '' : $_POST['leyka_donation_currency'];
 }
 
 function leyka_pf_get_donor_name_value() {

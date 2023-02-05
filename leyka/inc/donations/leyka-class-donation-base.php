@@ -8,7 +8,9 @@ abstract class Leyka_Donation_Base {
 
     abstract public function __construct($donation);
 
+    /** @todo Add the list of possible $field values */
     abstract public function __get($field);
+    /** @todo Add the list of possible $field & $value values */
     abstract public function __set($field, $value);
 
     /**
@@ -30,7 +32,7 @@ abstract class Leyka_Donation_Base {
         $params['force_insert'] = !empty($params['force_insert']);
 
         $params['amount'] = empty($params['amount']) ? leyka_pf_get_amount_value() : round((float)$params['amount'], 2);
-        $params['amount'] = $params['amount'] ? : 0.0;
+        $params['amount'] = $params['amount'] ? $params['amount'] : 0.0;
         if( !$params['amount'] && !$params['force_insert'] ) {
             return new WP_Error('incorrect_amount_given', __('Empty or incorrect amount given while trying to add a donation', 'leyka'));
         }
@@ -135,12 +137,14 @@ abstract class Leyka_Donation_Base {
         }
 
         $pm_data = leyka_pf_get_payment_method_value();
-        $pm_data = $pm_data ? : [
-            'payment_method_id' => empty($params['pm_id']) ?
-                (empty($params['payment_method_id']) ? '' : $params['payment_method_id']) :
-                $params['pm_id'],
-            'gateway_id' => empty($params['gateway_id']) ? '' : $params['gateway_id'],
-        ];
+        $pm_data = $pm_data ?
+            $pm_data :
+            [
+                'payment_method_id' => empty($params['pm_id']) ?
+                    (empty($params['payment_method_id']) ? '' : $params['payment_method_id']) :
+                    $params['pm_id'],
+                'gateway_id' => empty($params['gateway_id']) ? '' : $params['gateway_id'],
+            ];
 
         $pm_full_id = $pm_data['gateway_id'].'-'.$pm_data['payment_method_id'];
 
@@ -157,29 +161,32 @@ abstract class Leyka_Donation_Base {
         // Currency:
         $params['currency_id'] = empty($params['currency_id']) ?
             (empty($params['currency']) ? '' : mb_strtolower($params['currency'])) : mb_strtolower($params['currency_id']);
-        $params['currency_id'] = $params['currency_id'] ? : leyka_pf_get_currency_value();
+        $params['currency_id'] = $params['currency_id'] ? $params['currency_id'] : leyka_pf_get_currency_value();
+
         $params['currency_id'] = empty($params['currency_id']) || !leyka_get_currencies_data($params['currency_id']) ?
-            leyka_get_main_currency() : $params['currency_id'];
+            'RUB' : mb_strtoupper($params['currency_id']);
 
-        $params['main_currency_id'] = leyka_get_main_currency();
-
-        $params['main_currency_rate'] = leyka_get_currency_rate(strtolower($params['currency_id']));
-
+        $currency_rate = $params['currency_id'] == 'RUB' ?
+            1.0 : (float)leyka_options()->opt('currency_rur2'.mb_strtolower($params['currency_id']));
+        if( !$currency_rate || $currency_rate <= 0.0 ) {
+            $currency_rate = 1.0;
+        }
         // Currency - END
 
         // Donation total amount (with commission subtracted):
         $params['amount_total'] = empty($params['amount_total']) || !is_numeric($params['amount_total']) ?
             'auto' : round((float)$params['amount_total'], 2);
-
-        if((empty($params['amount_total']) || $params['amount_total'] === 'auto')
+        if(
+            (empty($params['amount_total']) || $params['amount_total'] === 'auto')
             && ( !empty($pm_data['payment_method_id']) && !empty($pm_data['gateway_id']) )
         ) {
             $params['amount_total'] = leyka_calculate_donation_total_amount(false, $params['amount'], $pm_full_id);
         }
 
-        $params['main_currency_amount'] = round((float)($params['amount']/$params['main_currency_rate']), 2);
-
-        $params['main_currency_amount_total'] = round((float)($params['amount_total']/$params['main_currency_rate']), 2);
+        $params['amount_in_main_currency'] = empty($params['amount_in_main_currency']) ?
+            $params['amount']*$currency_rate : round((float)$params['amount_in_main_currency'], 2);
+        $params['amount_total_in_main_currency'] = empty($params['amount_total_in_main_currency']) ?
+            $params['amount_total']*$currency_rate : round((float)$params['amount_total_in_main_currency'], 2);
         // Donation total amount - END
 
         // Additional fields:
@@ -247,15 +254,6 @@ abstract class Leyka_Donation_Base {
         return leyka_get_gateway_by_id($donation->gateway_id)->get_init_recurring_donation($donation);
 
     }
-
-    /**
-     * @param string $action Either 'add'|'+' to add +1 to Donation's cache value, or 'remove'|'-' to subtract 1 from it, or ''|false to recalculate it completely.
-     * @return boolean True if calculation/update are successful, false otherwise.
-     */
-    abstract public function update_recurring_funded_rebills_number($action = '');
-
-    abstract public function update_recurring_subscription_status();
-    abstract public function update_next_recurring_date();
 
     /** Donation metadata get & set methods are public to use them in the "gateway-specific data" hooks. */
     abstract public function get_meta($meta_key);

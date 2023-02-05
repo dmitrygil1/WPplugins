@@ -9,16 +9,6 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
 
     protected $_new_api_redirect_url = '';
 
-    protected function __construct() {
-
-        parent::__construct();
-
-        if(leyka_options()->get_value('yandex_new_api') && !function_exists('yookassaSdkLoadClass')) {
-            require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
-        }
-
-    }
-
     protected function _set_attributes() {
 
         $this->_id = 'yandex';
@@ -93,13 +83,6 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
                 'is_password' => true,
                 'field_classes' => ['new-api',],
             ],
-            $this->_id.'_return_url' => [
-                'type' => 'select',
-                'default' => '0',
-                'title' => __("Return page", 'leyka'),
-                'description' => __('A page to return from the gateway process page', 'leyka'),
-                'list_entries' => leyka_get_posts_list(['page', 'post', 'leyka_campaign']),
-            ],
             $this->_id.'_test_mode' => [
                 'type' => 'checkbox',
                 'default' => true,
@@ -109,69 +92,6 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
                 'field_classes' => ['old-api',],
             ],
         ];
-
-    }
-
-    public function _set_donations_errors() {
-
-        $this->_donations_errors_ids = [
-            '3d_secure_failed' => 'L-7002', 'call_issuer' => 'L-9001', 'canceled_by_merchant' => 'L-4001',
-            'card_expired' => 'L-7004', 'country_forbidden' => 'YK-6011', 'deal_expired' => 'YK-7006',
-            'expired_on_capture' => 'YK-7007', 'expired_on_confirmation' => 'YK-7005', 'fraud_suspected' => 'L-5043',
-            'general_decline' => 'L-4002', 'identification_required' => 'YK-6001', 'insufficient_funds' => 'L-7005',
-            'internal_timeout' => 'YK-8002', 'invalid_card_number' => 'L-7003', 'invalid_csc' => 'L-7001',
-            'issuer_unavailable' => 'L-5001', 'payment_method_limit_exceeded' => 'YK-7042',
-            'payment_method_restricted' => 'L-6001', 'permission_revoked' => 'YK-7043',
-            'unsupported_mobile_operator' => 'YK-7050',
-        ];
-
-        // Only Gateway-specific errors are initialized & added as objects here:
-        Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-6001',
-            __('The operations limit for YooMoney wallet is exceeded', 'leyka'), [
-                'recommendation_admin' => __('Ask the donor to identify their YooMoney wallet, if possible, or to use another payment method.', 'leyka'),
-                'recommendation_donor' => __('Please, identify your YooMoney wallet, if possible, or use another payment method.', 'leyka'),
-        ]) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-6011',
-            __('Bank card payment is refused because of the country that issued the card', 'leyka'), [
-                'recommendation_admin' => __("Ask the donor to use another payment method (i.e., another card). If this won't help, ask the donor to contact the bank that issued the card.", 'leyka'),
-                'recommendation_donor' => __("Please, try to use another payment method (i.e., another card). If this won't help, report this issue to the bank that issued the card.", 'leyka'),
-        ]) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-7005',
-            __('The allowed time for the payment is expired', 'leyka'), [
-            'description' => __("Donor waited for too long on the payment data entering step, so the payment wasn't completed in time allowed.", 'leyka'),
-            'recommendation_admin' => __("Ask the donor to make a donation anew, but now finish it.", 'leyka'),
-            'recommendation_donor' => __("You didn't confirm the payment in time, so it was was aborted. Your money are intact, but if you'd like to finish the donation, you should make it anew (and now complete it).", 'leyka'),
-        ]) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-7006',
-            __('The payment deal is expired', 'leyka')
-        ) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-7007',
-            __('The payment time for a two-staged (captured) payment is expired', 'leyka')
-        ) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-7042',
-            __('The operations limit for the bank card or the shop is exceeded', 'leyka'), [
-                'recommendation_admin' => __("Ask the donor to use another payment method (i.e., another card). If this won't help, ask the donor to try to pay 1-2 days later. If the problem will persist, contact the gateway technical support.", 'leyka'),
-                'recommendation_donor' => sprintf(__("Please, try to use another payment method (i.e., another card). If it's not helping, try to pay 1-2 days later. If the problem still persists, ask the <a href='mailto:%s' target='_blank'>website administration</a> to report this to the gateway technical support.", 'leyka'), leyka_options()->opt('tech_support_email')),
-        ]) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-8002',
-            __("Payment wasn't finished due to YooKassa internal timeout", 'leyka'), [
-                'description' => __("Technical troubles on the YooKassa side - the payment handling couldn't be completed in time allowed for the operation.", 'leyka'),
-                'recommendation_admin' => __("For some reason, YooKassa didn't process this payment in time allowed (30 seconds by default). Please, contact your YooKassa manager, and ask them for the reason. If it was temporary technical failure, contact the donor and ask him/her to make a donation anew.", 'leyka'),
-                'recommendation_donor' => sprintf(__("The payment gateway didn't process your payment in time, and the payment was aborted. Your money are intact, but if you'd like to finish the payment, you should make it anew. If the problem persists, please contact the <a href='mailto:%s' target='_blank'>website technical support</a> and tell them that you have a problem making a donation due to the gateway behavior.", 'leyka'), leyka_options()->opt('tech_support_email')),
-        ]) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-7043',
-            __("Can't make a rebill payment - the donor revoked the auto-payments permission", 'leyka'), [
-                'description' => __('Unable to make a rebill auto-payment: the donor user has revoked permission for auto payments. If the donor wants to continue with the recurring subscription, they will need to create a new subscription and confirm the initial payment.', 'leyka'),
-                'recommendation_admin' => __("Ask the donor to make a recurring donations subscription anew, as their current subscription can't proceed with its auto-payments and will be deactivated.", 'leyka'),
-                'recommendation_donor' => __("Please, make a recurring donations subscription anew, as your current subscription can't proceed with its auto-payments and will be deactivated.", 'leyka'),
-        ]) && Leyka_Donations_Errors::get_instance()->add_error(
-            'YK-7050',
-            __("Can't make a payment from the selected mobile operator", 'leyka'), [
-                'description' => __("YooKassa doesn't support mobile payments from the mobile operator used.", 'leyka'),
-                'recommendation_admin' => sprintf(__('Ask the donor to make a new mobile payment using one of the mobile operators supported by YooKassa (<a href="%s" target="_blank">operators list</a>).', 'leyka'), 'https://yookassa.ru/docs/support/payments/accept-methods#carrier-billing'),
-                'recommendation_donor' => sprintf(__('Please, make a new mobile payment using one of the mobile operators supported by YooKassa (<a href="%s" target="_blank">operators list</a>).', 'leyka'), 'https://yookassa.ru/docs/support/payments/accept-methods#carrier-billing'),
-        ]);
 
     }
 
@@ -215,21 +135,13 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
             $donation->add_gateway_response($gateway_response);
         }
 
-        if($donation->status !== 'failed') {
-
-            $donation->status = 'failed';
-            Leyka_Donation_Management::send_error_notifications($donation); // Emails will be sent only if their options are on
-
+        if($donation->status === 'failed') {
+            return;
         }
 
-        if(
-            is_a($gateway_response, 'YooKassa\Request\Payments\PaymentResponse')
-            && $gateway_response->status === 'canceled'
-            && !empty($gateway_response->cancellation_details)
-            && !empty($gateway_response->cancellation_details->reason)
-        ) {
-            $donation->error_id = $this->get_donation_error_id($gateway_response->cancellation_details->reason);
-        }
+        $donation->status = 'failed';
+
+        Leyka_Donation_Management::send_error_notifications($donation); // Emails will be sent only if respective options are on
 
     }
 
@@ -246,20 +158,14 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
 
         if(leyka_options()->opt('yandex_new_api')) {
 
-//            if( !function_exists('yookassaSdkLoadClass') ) {
-//                require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
-//            }
+            if( !function_exists('yookassaSdkLoadClass') ) {
+                require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
+            }
 
             $client = new YooKassa\Client();
             $client->setAuth(leyka_options()->opt('yandex_shop_id'), leyka_options()->opt('yandex_secret_key'));
 
             try {
-
-                $return_page_id = leyka_options()->opt('yandex_return_url');
-                $home_url = home_url();
-                $return_url = $return_page_id ? // Due to strange YooKassa SDK bug - it doesn't accept URLs w/o "/" at the end
-                    get_post_permalink($return_page_id) :
-                    (mb_substr($home_url, -1, 1) === '/' ? $home_url : $home_url.'/');
 
                 $payment_data = [
                     'amount' => [
@@ -268,7 +174,8 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
                     ],
                     'confirmation' => [
                         'type' => 'redirect',
-                        'return_url' => $return_url,
+                        'return_url' => empty($form_data['leyka_success_page_url']) ?
+                            leyka_get_success_page_url() : $form_data['leyka_success_page_url'],
                     ],
                     'capture' => true, // Make payment at once, don't wait for shop confirmation
                     'description' => leyka_get_donation_gateway_description($donation, 128),
@@ -285,10 +192,7 @@ class Leyka_Yandex_Gateway extends Leyka_Gateway {
                     $payment_data['payment_method_data'] = ['type' => $this->_get_gateway_pm_id($pm_id),];
                 }
 
-                $payment = $client->createPayment(
-                        apply_filters('leyka_yandex_custom_payment_data', $payment_data, $pm_id, $donation_id),
-                        uniqid('', true)
-                );
+                $payment = $client->createPayment($payment_data, uniqid('', true));
 
                 $donation->add_gateway_response($payment); // On callback the response will be re-written
 
@@ -409,9 +313,9 @@ techMessage="'.$tech_message.'"/>');
             case 'response':
             case 'notify':
 
-//                if( !function_exists('yookassaSdkLoadClass') ) {
-//                    require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
-//                }
+                if( !function_exists('yookassaSdkLoadClass') ) {
+                    require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
+                }
 
                 $notification = json_decode(file_get_contents('php://input'), true);
 
@@ -498,10 +402,6 @@ techMessage="'.$tech_message.'"/>');
                         $donation->status = 'refunded';
                         break;
                     default: // Other possible gateway-side payment statuses: 'pending', 'waiting_for_capture'
-                }
-
-                if($donation->type === 'rebill') {
-                    do_action('leyka_new_rebill_donation_added', $donation);
                 }
 
                 exit(200);
@@ -600,10 +500,6 @@ techMessage="'.$tech_message.'"/>');
 
 				do_action('leyka_yandex_payment_aviso_success', $donation);
 
-                if($donation->type === 'rebill') {
-                    do_action('leyka_new_rebill_donation_added', $donation);
-                }
-
                 $this->_callback_answer(0, 'pa'); // OK for yandex money payment
                 break; // Not needed, just for my IDE could relax
 
@@ -616,6 +512,10 @@ techMessage="'.$tech_message.'"/>');
 
         if( !$donation->gateway_response ) {
             return [];
+        }
+
+        if( !function_exists('yookassaSdkLoadClass') ) {
+            require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
         }
 
         $response = is_object($donation->gateway_response) || is_array($donation->gateway_response) ?
@@ -719,9 +619,9 @@ techMessage="'.$tech_message.'"/>');
 
         if(leyka_options()->opt('yandex_new_api')) {
 
-//            if( !function_exists('yookassaSdkLoadClass') ) {
-//                require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
-//            }
+            if( !function_exists('yookassaSdkLoadClass') ) {
+                require_once LEYKA_PLUGIN_DIR.'gateways/yandex/lib/autoload.php';
+            }
 
             $client = new YooKassa\Client();
             $client->setAuth(leyka_options()->opt('yandex_shop_id'), leyka_options()->opt('yandex_secret_key'));
@@ -763,7 +663,9 @@ techMessage="'.$tech_message.'"/>');
 
             $ch = curl_init();
             $params = [
-                CURLOPT_URL => 'https://shop.yookassa.ru/webservice/mws/api/repeatCardPayment',
+                CURLOPT_URL => leyka_options()->opt('yandex_test_mode') ?
+                    'https://penelope-demo.yamoney.ru/webservice/mws/api/repeatCardPayment' :
+                    'https://penelope.yamoney.ru/webservice/mws/api/repeatCardPayment',
                 CURLOPT_PORT => leyka_options()->opt('yandex_test_mode') ? 8083 : 443,
                 CURLOPT_HEADER => false,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
@@ -968,34 +870,6 @@ techMessage="'.$tech_message.'"/>');
         }
 
         return $order_number;
-
-    }
-
-    public function get_legacy_donation_error_id($error_id, Leyka_Donation_Base $donation) {
-
-        if($error_id) {
-            return $error_id;
-        } else if($donation->status !== 'failed') {
-            return false;
-        }
-
-        $gateway_response = $donation->gateway_response;
-        if(
-            is_a($gateway_response, 'YooKassa\Request\Payments\PaymentResponse')
-            && $gateway_response->status === 'canceled'
-            && !empty($gateway_response->cancellation_details)
-            && !empty($gateway_response->cancellation_details->reason)
-        ) {
-
-            $error_id = $this->get_donation_error_id($gateway_response->cancellation_details->reason);
-
-            if($error_id) {
-                $this->error_id = $error_id;
-            }
-
-        }
-
-        return $error_id;
 
     }
 

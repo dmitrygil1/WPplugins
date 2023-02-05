@@ -309,10 +309,6 @@ class Leyka_Rbk_Gateway extends Leyka_Gateway {
         }
         // GUA direct integration - "purchase" event END
 
-        if($donation->type === 'rebill') {
-            do_action('leyka_new_rebill_donation_added', $donation);
-        }
-
         return $donation->add_gateway_response($data_to_log);
 
     }
@@ -401,7 +397,6 @@ class Leyka_Rbk_Gateway extends Leyka_Gateway {
                 'init_recurring_donation' => $init_recurring_donation->id,
                 'rbk_invoice_id' => false,
                 'rbk_payment_id' => false,
-                'date' => '' // don't copy the date
             ],
             ['recalculate_total_amount' => true,]
         );

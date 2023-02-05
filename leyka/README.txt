@@ -4,8 +4,8 @@ Author URI: http://te-st.ru
 Plugin URI: http://leyka.te-st.ru
 Tags: лейка, crowdfunding, fundraising, donations, recurring donations, charity, leyka, recurring, cloudpayments, webmoney, robokassa, rbk, rbkmoney, rbk-money, yoomoney, chronopay, sms, yookassa, миксплат, mixplat, paypal, paymaster, qiwi, киви, stripe, страйп, gds, google data studio
 Requires at least: 3.6.1
-Tested up to: 6.1.1
-Stable tag: 3.29.2
+Tested up to: 5.9.3
+Stable tag: 3.25
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -83,71 +83,6 @@ For technical support questions, please, use the [plugin support email](maillto:
 5. The plugin start page (a console)
 
 == Changelog ==
-= 3.29.2 =
-* Fix: Daily Rouble mode is now working correctly (only with main currency).
-* Fix: Merchandise + Multicurrency bug fixed.
-* Fix: Donor details admin page bug fixed.
-* Fix: "Do not display" checkbox for the Need Help template bug fixed.
-* Fix: now finished Campaigns' recurring auto-payments change their status correctly.
-* Fix: Payment Methods swiper in the cases when non-main currency is selected - fixed.
-* Fix: Multi-currency + Campaign total funded amount recalculation fixed.
-* Fix: incorrect amount of the [leyka_amount_collected] shortcode in cases of many Donations currencies fixed.
-* Fix: small fixes.
-
-= 3.29.1 =
-* Fix: YooKassa compatibility fix for WP 6.1.
-* Fix: Demirbank notices bug fixed.
-* Fix: the custom admin info pages access error bug fixed.
-* Fix: small fixes.
-
-= 3.29 =
-* New: Muli-currencies system added.
-* New: CloudPayments - subscriptions import support feature added.
-* Fix: DemirBank gateway support.
-* Fix: small fixes.
-
-= 3.28 =
-* New: SBP system for Mixplat added.
-* New: cryptocurrencies support added.
-* New: return page option for Yookassa gateway added.
-* Fix: recurrents health module subscriptions status update fixed.
-* Fix: donation hooks now work correctly.
-* Fix: admin donations list filters fix.
-* Fix: small fixes.
-
-= 3.27 =
-* New: new Recurring Health engine (v.1b) is added.
-* New: now Additional fields placeholders can be used in the Donations notifications emails.
-* New: Redis & other object caching systems compatibility mode added for post-based Donations storage.
-* Fix: YooMoney for Physical persons Gateway behavior fixed.
-* Fix: Liqpay - fixes.
-* Fix: "sticky posts" incompatibility bug fixed.
-* Fix: the rare str_contains() error fixed.
-* Fix: small fixes.
-
-= 3.26.1 =
-* New: Campaigns categories feature added.
-* Fix: small Donations handling fixes.
-* Fix: conflicts with Mihdan plugins are fixed.
-
-= 3.26 =
-* New: now Donations errors full info & recommendations to fix them are displayed completely. YooKassa & CloudPayments gateways errors are added like this.
-* New: the new parameter value added for the "leyka_donations_list" shortcode. Now Donors' names may be optionally masked.
-* New: new filtering option added for Leyka_Donations::get() methods.
-* New: small functional additions & changes in the Donations' admin list table.
-* New: now Donor's name & additional fields values are passed to CP via payment widget fields.
-* Fix: Additional fields values missing in Donation export results is now fixed.
-* Fix: the rare bug when init recurring Donations' Donor thanking emails were sent without Donor account link - is fixed.
-* Fix: Donor total funded amount count bug on a new Donation fixed.
-* Fix: Liqpay callbacks responses fixed.
-* Fix: recurring subscription cancelling via link from non-init recurring Donations fixed.
-* Fix: rebills date bug fixed.
-* Fix: the "Need Help" form template behavior for smaller containers is greatly improved.
-* Fix: small fixes.
-~ Tweak: Recurring subscriptions - funded rebills number cache added.
-~ Tweak: Recurring subscriptions - funded rebills number cache added.
-~ Tweak: small optimizations.
-
 = 3.25 =
 * New: now Leyka is fully PHP 8.* compatible.
 * New: Dashboard admin page is updated.

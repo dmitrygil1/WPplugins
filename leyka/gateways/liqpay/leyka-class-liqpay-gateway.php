@@ -25,6 +25,7 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
         $this->_min_commission = 2.75;
         $this->_receiver_types = ['legal'];
         $this->_may_support_recurring = true;
+        $this->_countries = ['ua',];
 
     }
 
@@ -107,10 +108,8 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
     public function set_specific_data_value($field_name, $value, Leyka_Donation_Base $donation) {
         switch ($field_name) {
             case 'recurring_id':
-            case 'liqpay_recurring_id':
                 return Leyka_Donations::get_instance()->set_donation_meta($donation->id, '_liqpay_recurring_id', $value);
             case 'card_token':
-            case 'liqpay_card_token':
                 return Leyka_Donations::get_instance()->set_donation_meta($donation->id, '_liqpay_card_token', $value);
             case 'liqpay_customer_id':
                 return Leyka_Donations::get_instance()->set_donation_meta($donation->id, '_liqpay_customer_id', $value);
@@ -121,91 +120,6 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
             default:
                 return false;
         }
-    }
-
-    public function display_donation_specific_data_fields($donation = false) {
-
-        if($donation) { // Edit donation page displayed
-
-            $donation = Leyka_Donations::get_instance()->get_donation($donation);?>
-
-            <label><?php _e('Liqpay order ID', 'leyka');?>:</label>
-
-            <div class="leyka-ddata-field">
-
-                <?php if($donation->type === 'correction') {?>
-                    <input type="text" id="liqpay-order-id" name="liqpay-order-id" placeholder="<?php _e('Enter Liqpay order ID', 'leyka');?>" value="<?php echo $donation->liqpay_order_id;?>">
-                <?php } else {?>
-                    <span class="fake-input"><?php echo $donation->liqpay_order_id;?></span>
-                <?php }?>
-            </div>
-
-            <label><?php _e('Liqpay transaction ID', 'leyka');?>:</label>
-
-            <div class="leyka-ddata-field">
-
-                <?php if($donation->type === 'correction') {?>
-                    <input type="text" id="liqpay-transaction-id" name="liqpay-transaction-id" placeholder="<?php _e('Enter Liqpay transaction ID', 'leyka');?>" value="<?php echo $donation->liqpay_transaction_id;?>">
-                <?php } else {?>
-                    <span class="fake-input"><?php echo $donation->liqpay_transaction_id;?></span>
-                <?php }?>
-            </div>
-
-            <?php if($donation->type !== 'rebill') {
-                return;
-            }?>
-
-            <label><?php _e('Liqpay recurring subscription ID', 'leyka');?>:</label>
-
-            <div class="leyka-ddata-field">
-
-                <?php if($donation->type === 'correction') {?>
-                    <input type="text" id="liqpay-recurring-id" name="liqpay-recurring-id" placeholder="<?php _e('Enter Liqpay recurring subscription ID', 'leyka');?>" value="<?php echo $donation->liqpay_recurring_id;?>">
-                <?php } else {?>
-                    <span class="fake-input"><?php echo $donation->liqpay_recurring_id;?></span>
-                <?php }?>
-            </div>
-
-            <label><?php _e('Liqpay card token', 'leyka');?>:</label>
-
-            <div class="leyka-ddata-field">
-
-                <?php if($donation->type === 'correction') {?>
-                    <input type="text" id="liqpay-card-token" name="liqpay-card-token" placeholder="<?php _e('Enter Liqpay card token', 'leyka');?>" value="<?php echo $donation->liqpay_card_token;?>">
-                <?php } else {?>
-                    <span class="fake-input"><?php echo $donation->liqpay_card_token;?></span>
-                <?php }?>
-            </div>
-
-            <?php $init_recurring_donation = $donation->init_recurring_donation;?>
-
-            <div class="recurring-is-active-field">
-
-                <label><?php _e('Recurring subscription is active', 'leyka');?>:</label>
-                <div class="leyka-ddata-field">
-                    <?php echo $init_recurring_donation->recurring_is_active ? __('yes', 'leyka') : __('no', 'leyka');
-
-                    if( !$init_recurring_donation->recurring_is_active && $init_recurring_donation->recurring_cancel_date ) {
-                        echo ' ('.sprintf(__('canceled on %s', 'leyka'), date(get_option('date_format').', '.get_option('time_format'), $init_recurring_donation->recurring_cancel_date)).')';
-                    }?>
-                </div>
-
-            </div>
-
-        <?php } else { // New donation page displayed ?>
-
-            <label for="cp-transaction-id"><?php _e('CloudPayments transaction ID', 'leyka');?>:</label>
-            <div class="leyka-ddata-field">
-                <input type="text" id="cp-transaction-id" name="cp-transaction-id" placeholder="<?php _e('Enter CloudPayments transaction ID', 'leyka');?>" value="">
-            </div>
-
-            <label for="cp-recurring-id"><?php _e('CloudPayments subscription ID', 'leyka');?>:</label>
-            <div class="leyka-ddata-field">
-                <input type="text" id="cp-recurring-id" name="cp-recurring-id" placeholder="<?php _e('Enter CloudPayments subscription ID', 'leyka');?>" value="">
-            </div>
-
-        <?php }
-
     }
 
     public function submission_form_data($form_data_vars, $pm_id, $donation_id) {
@@ -263,10 +177,6 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
 
     public function _handle_service_calls($call_type = '') {
 
-        if(empty($_POST['data'])) { // Sometimes Liqpay just sends empty callbacks
-            exit(200);
-        }
-
         // Decode a response:
         $data = json_decode(base64_decode($_POST['data']));
         $data = is_array($data) ? $data : (array)$data;
@@ -294,7 +204,8 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
 
             }
 
-            exit(200);
+            status_header(200);
+            die();
 
         }
 
@@ -317,10 +228,7 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
 
                     $donation = Leyka_Donations::get_instance()->add_clone(
                         $donation,
-                        [
-                            'init_recurring_donation' => $donation->id,
-                            'date' => '' // don't copy the date
-                        ],
+                        ['init_recurring_donation' => $donation->id,],
                         ['recalculate_total_amount' => true,]
                     );
 
@@ -343,8 +251,6 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
 
                 }
 
-                do_action('leyka_new_rebill_donation_added', $donation);
-
             }
 
         } else if( !empty($data['action']) && $data['action'] === 'pay' ) { // Single donation
@@ -359,13 +265,6 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
                 default:
                     $new_status = 'submitted';
             }
-
-        }
-
-        if( !$donation || empty($new_status) ) {
-
-            wp_redirect(leyka_get_failure_page_url());
-            exit(200);
 
         }
 
@@ -418,8 +317,9 @@ class Leyka_Liqpay_Gateway extends Leyka_Gateway {
 
         }
 
-        wp_redirect($redirect_url);
-        exit(200);
+//        status_header(200); wp_redirect($redirect_url);
+        wp_redirect($redirect_url, 200);
+        exit;
 
     }
 
@@ -532,7 +432,7 @@ class Leyka_Liqpay extends Leyka_Payment_Method {
             LEYKA_PLUGIN_BASE_URL.'gateways/liqpay/icons/Liqpay_logo_full.svg',
         ]);
 
-        $this->_supported_currencies = ['uah', 'usd', 'eur'];
+        $this->_supported_currencies = ['rub', 'uah', 'usd', 'eur',];
         $this->_default_currency = 'uah';
 
     }
@@ -566,7 +466,7 @@ class Leyka_Liqpay_Card extends Leyka_Payment_Method {
             LEYKA_PLUGIN_BASE_URL.'img/pm-icons/card-maestro.svg',
         ]);
 
-        $this->_supported_currencies = ['uah', 'usd', 'eur'];
+        $this->_supported_currencies = ['rub', 'uah', 'usd', 'eur',];
         $this->_default_currency = 'uah';
 
     }
@@ -602,7 +502,7 @@ class Leyka_Liqpay_Privat24 extends Leyka_Payment_Method {
             LEYKA_PLUGIN_BASE_URL.'gateways/liqpay/icons/privat_logo_short.svg',
         ]);
 
-        $this->_supported_currencies = ['uah', 'usd', 'eur'];
+        $this->_supported_currencies = ['rub', 'uah', 'usd', 'eur',];
         $this->_default_currency = 'uah';
 
     }

@@ -100,7 +100,7 @@ abstract class Leyka_Donations extends Leyka_Singleton {
         $settings = array_merge(['recalculate_total_amount' => false,], $settings);
 
         $new_donation_id = $this->add(array_merge([
-            'date' => date('Y-m-d H:i:s', $original->date_timestamp),
+            'date' => $original->date,
             'status' => $original->status,
             'payment_type' => $original->payment_type,
             'purpose_text' => $original->title,
@@ -178,7 +178,7 @@ class Leyka_Donations_Posts extends Leyka_Donations {
 
     protected function _get_donation($donation) {
 
-        try {
+        try{
             $donation = new Leyka_Donation_Post($donation);
         } catch(Exception $ex) {
             $donation = false;
@@ -213,21 +213,6 @@ class Leyka_Donations_Posts extends Leyka_Donations {
             $params['donation_id'] = is_array($params['donation_id']) ? $params['donation_id'] : [$params['donation_id']];
 
             $query_params['post__in'] = array_filter($params['donation_id'], function($donation_id){
-                return absint($donation_id);
-            });
-
-        }
-
-        $params['donation_id_excluded'] = empty($params['donations_ids_excluded']) ?
-            (empty($params['donation_id_excluded']) ? [] : $params['donation_id_excluded']) :
-            $params['donations_ids_excluded'];
-
-        if($params['donation_id_excluded']) {
-
-            $params['donation_id_excluded'] = is_array($params['donation_id_excluded']) ?
-                $params['donation_id_excluded'] : [$params['donation_id_excluded']];
-
-            $query_params['post__not_in'] = array_filter($params['donation_id_excluded'], function($donation_id){
                 return absint($donation_id);
             });
 
@@ -316,23 +301,24 @@ class Leyka_Donations_Posts extends Leyka_Donations {
 
         if(isset($params['date_from'])) {
 
-            $date = date('Y-m-d 00:00:00', strtotime($params['date_from']));
+            $date = DateTime::createFromFormat('d.m.Y', $params['date_from']);
+            $date = $date ? $date : DateTime::createFromFormat('Y-m-d', $params['date_from']);
 
             if($date) {
-                $query_params['date_query'][] = ['after' => $date, 'inclusive' => true,];
+                $query_params['date_query'][] = ['after' => $date->format('Y-m-d 00:00:00'), 'inclusive' => true,];
             }
 
         }
         if(isset($params['date_to'])) {
 
-            $date = date('Y-m-d 23:59:59', strtotime($params['date_to']));
+            $date = DateTime::createFromFormat('d.m.Y', $params['date_to']);
+            $date = $date ? $date : DateTime::createFromFormat('Y-m-d', $params['date_to']);
 
             if($date) {
-                $query_params['date_query'][] = ['before' => $date, 'inclusive' => true,];
+                $query_params['date_query'][] = ['before' => $date->format('Y-m-d 23:59:59'), 'inclusive' => true,];
             }
 
         }
-
         // Donation date filtering - END
 
         if( !empty($params['recurring_only_init']) ) {
@@ -367,20 +353,14 @@ class Leyka_Donations_Posts extends Leyka_Donations {
             } else if(mb_stripos($params['amount_filter'], '>=') !== false) {
                 $params['meta'][] = [
                     'key' => 'leyka_donation_amount',
-                    'value' => round(str_replace('>=', '', $params['amount_filter']), 2),
+                    'value' => (int)str_replace('>=', '', $params['amount_filter']),
                     'compare' => '>=',
                 ];
             } else if(mb_stripos($params['amount_filter'], '<=') !== false) {
                 $params['meta'][] = [
                     'key' => 'leyka_donation_amount',
-                    'value' => round(str_replace('<=', '', $params['amount_filter']), 2),
+                    'value' => (int)str_replace('<=', '', $params['amount_filter']),
                     'compare' => '<=',
-                ];
-            } else if(mb_stripos($params['amount_filter'], '=') !== false) {
-                $params['meta'][] = [
-                    'key' => 'leyka_donation_amount',
-                    'value' => round(str_replace('=', '', $params['amount_filter']), 2),
-                    'compare' => '=',
                 ];
             }
 
@@ -416,22 +396,6 @@ class Leyka_Donations_Posts extends Leyka_Donations {
             } else if($params['payment_type'] == 'rebill-init') {
 
                 $query_params['post_parent'] = 0;
-                $params['payment_type'] = 'rebill';
-
-            } else if($params['payment_type'] == 'rebill-auto-payment') {
-
-                add_filter('posts_where', function ($where) {
-
-                    global $wpdb;
-
-                    if ( strpos($where, " AND ".$wpdb->prefix."posts.post_parent > 0 ") === false) {
-                        $where .= " AND ".$wpdb->prefix."posts.post_parent > 0 ";
-                    }
-
-                    return $where;
-
-                }, 10, 1);
-
                 $params['payment_type'] = 'rebill';
 
             }
@@ -540,53 +504,6 @@ class Leyka_Donations_Posts extends Leyka_Donations {
                 ['key' => 'leyka_donor_subscribed', 'compare' => 'NOT EXISTS'];
         }
 
-        if( !empty($params['recurring_subscription_status']) ) {
-
-            if($params['recurring_subscription_status'] === 'active') {
-
-                $params['meta'][] = [
-                    'relation' => 'OR',
-                    [
-                        'key' => 'leyka_recurring_subscription_status',
-                        'compare' => 'NOT EXISTS'
-                    ],
-                    [
-                        'key' => 'leyka_recurring_subscription_status',
-                        'value' => 'active'
-                    ]
-                ];
-                $params['meta'][] = [
-                    ['key' => '_rebilling_is_active', 'value' => true]
-                ];
-
-            } else if($params['recurring_subscription_status'] === 'non-active') {
-
-                $params['meta'][] = [
-                    'relation' => 'OR',
-                    [
-                        'key' => 'leyka_recurring_subscription_status',
-                        'compare' => 'NOT EXISTS'
-                    ],
-                    [
-                        'key' => 'leyka_recurring_subscription_status',
-                        'value' => 'non-active'
-                    ]
-                ];
-                $params['meta'][] = [
-                    ['key' => '_rebilling_is_active', 'value' => false]
-                ];
-
-            } else {
-                $params['meta'][] = [
-                    'key' => 'leyka_recurring_subscription_status',
-                    'value' => $params['recurring_subscription_status'],
-                    'compare' => 'IN'
-                ];
-            }
-
-
-        }
-
         if(count($params['meta'])) {
 
             if( empty($params['meta']['relation']) || !in_array($params['meta']['relation'], ['AND', 'OR']) ) {
@@ -647,11 +564,9 @@ class Leyka_Donations_Posts extends Leyka_Donations {
             default:
         }
 
-        /**
-         * @todo При очень большом кол-ве записей о пожертвованиях WP_Query отдает ошибку,
-         * если $query_params['posts_per_page'] === -1. Разобраться, ограничение ли это WP, баг или бутылочное горлышко
-         * производительности серверов.
-         */
+        // TODO: При очень большом кол-ве записей о пожертвованиях WP_Query отдает ошибку если
+        //  $query_params['posts_per_page'] === -1. Разобраться ограничение это WP, баг или бутылочное горлышко
+        //  производительности серверов.
         $query_params['posts_per_page'] = $query_params['posts_per_page'] === -1 ? 9999 : $query_params['posts_per_page'];
 
         return new WP_Query($query_params);
@@ -824,23 +739,6 @@ class Leyka_Donations_Separated extends Leyka_Donations {
             $where['donation_id'] = "{$wpdb->prefix}leyka_donations.ID IN (".implode(',', $params['donation_id']).")";
 
         }
-
-        $params['donation_id_excluded'] = isset($params['donations_ids_excluded']) ?
-            $params['donations_ids_excluded'] :
-            (isset($params['donation_id_excluded']) ? $params['donation_id_excluded'] : false);
-
-        if($params['donation_id_excluded']) {
-
-            $params['donation_id_excluded'] = is_array($params['donation_id_excluded']) ?
-                $params['donation_id_excluded'] : [$params['donation_id_excluded']];
-            $params['donation_id_excluded'] = array_filter($params['donation_id_excluded'], function($donation_id){
-                return absint($donation_id);
-            });
-
-            $where['donation_id_excluded'] =
-                "{$wpdb->prefix}leyka_donations.ID NOT IN (".implode(',', $params['donation_id_excluded']).")";
-
-        }
         // Donation ID filtering - END
 
         // Donor ID filtering:
@@ -924,22 +822,6 @@ class Leyka_Donations_Separated extends Leyka_Donations {
 
                 $params['payment_type'] = 'rebill';
                 $params['meta'][] = ['key' => 'init_recurring_donation_id', 'value' => 0,];
-
-            } else if($params['payment_type'] == 'rebill-auto-payment') {
-
-                $params['payment_type'] = 'rebill';
-
-                add_filter('posts_where', function ($where) {
-
-                    global $wpdb;
-
-                    if ( strpos($where, " AND ".$wpdb->prefix."posts.post_parent > 0 ") === false) {
-                        $where .= " AND ".$wpdb->prefix."posts.post_parent > 0 ";
-                    }
-
-                    return $where;
-
-                }, 10, 1);
 
             }
 
@@ -1153,10 +1035,6 @@ class Leyka_Donations_Separated extends Leyka_Donations {
             } else if(stripos($params['amount_filter'], '<=') !== false) {
                 $where['amount'] = $wpdb->prepare(
                     "{$wpdb->prefix}leyka_donations.amount <= %f", round(str_replace('<=', '', $params['amount_filter']), 2)
-                );
-            } else if(mb_stripos($params['amount_filter'], '=') !== false) {
-                $where['amount'] = $wpdb->prepare(
-                    "{$wpdb->prefix}leyka_donations.amount = %f", round(str_replace('=', '', $params['amount_filter']), 2)
                 );
             }
 

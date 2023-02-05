@@ -132,7 +132,6 @@ class Leyka_Robokassa_Gateway extends Leyka_Gateway {
             'Shp_item' => 1, // Maybe, not needed
             'IncCurrLabel' => $pm_curr, // Default PM + Currency. "R" for "RUB", as we'll always use RUB for now
             'Culture' => get_locale() == 'ru_RU' ? 'ru' : 'en',
-            'Email' => $donation->donor_email
         ];
 
         if(leyka_options()->opt('robokassa_test_mode')) {
@@ -159,7 +158,6 @@ class Leyka_Robokassa_Gateway extends Leyka_Gateway {
                 'status' => 'submitted',
                 'payment_type' => 'rebill',
                 'init_recurring_donation' => $init_recurring_donation->id,
-                'date' => '' // don't copy the date
             ],
             ['recalculate_total_amount' => true,]
         );
@@ -215,8 +213,6 @@ class Leyka_Robokassa_Gateway extends Leyka_Gateway {
         }
 
         curl_close($ch);
-
-        do_action('leyka_new_rebill_donation_added', $new_recurring_donation);
 
         return $new_recurring_donation;
 
