@@ -45,10 +45,7 @@ function leyka_get_pm_list($activity = null, $currency = false, $sorted = true) 
                 continue;
             }
 
-            $gw = leyka_get_gateway_by_id($pm->gateway_id);
-
-            if( ( !$activity || $pm->active == $activity ) &&
-                ( !$currency || ($gw->is_currency_active($currency) && $pm->has_currency_support($currency)) ) ) {
+            if( ( !$activity || $pm->active == $activity ) && ( !$currency || $pm->has_currency_support($currency) ) ) {
                 $pm_list[] = $pm;
             }
 
@@ -199,34 +196,6 @@ function leyka_gateway_setup_wizard($gateway) {
     return $gateway->has_wizard ? $gateway->id : false;
 }
 
-
-function leyka_gw_is_currency_active($currency_id, $gw_id = null) {
-
-    if( !$gw_id ) {
-
-        $gws = leyka_get_gateways();
-
-        /** @var Leyka_Gateway $gw */
-        foreach($gws as $gw) {
-            if($gw->is_currency_active($currency_id)){
-                return true;
-            };
-        }
-
-        return false;
-
-    } else {
-
-        $gw = leyka_get_gateway_by_id($gw_id);
-
-        return $gw->is_currency_active($currency_id);
-
-    }
-
-}
-
-
-
 abstract class Leyka_Gateway extends Leyka_Singleton {
 
     protected static $_instance;
@@ -238,6 +207,7 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     protected $_docs_link = ''; // Gateways user manual page URL
     protected $_registration_link = ''; // Gateway registration page URL
     protected $_has_wizard = false;
+    protected $_countries = ['ru',];
 
     protected $_min_commission = 0.0;
     protected $_receiver_types = ['legal']; // legal|physical
@@ -245,30 +215,24 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     protected $_may_support_recurring = false; // Are recurring payments possible via gateway at all
     protected $_recurring_auto_cancelling_supported = true; // Is it possible to cancel recurring payments via Gateway API
 
-    protected $_active_currencies = [];
     protected $_payment_methods = []; // Supported PMs array
     protected $_options = []; // Gateway configs
 
-    protected $_donations_errors_ids = []; // A list of Gateway errors IDs and their respective Leyka errors IDs
-
     protected function __construct() {
 
-        parent::__construct();
-
-        $this->_set_attributes(); // Initialize main Gateway's attributes
-        $this->_set_options_defaults(); // Set configurable options in admin area
-        $this->_set_gateway_pm_list(); // Initialize or restore Gateway's PMs list and all their options
-        $this->_set_donations_errors(); // Initialize Gateway's possible Donations errors list
-
         // A gateway icon is an attribute that is persistent for all gateways, it's just changing values:
-        $this->_icon = !$this->_icon && file_exists(LEYKA_PLUGIN_DIR."/gateways/{$this->_id}/icons/{$this->_id}.svg") ?
-            LEYKA_PLUGIN_BASE_URL."/gateways/{$this->_id}/icons/{$this->_id}.svg" : $this->_icon;
-        $this->_icon = !$this->_icon && file_exists(LEYKA_PLUGIN_DIR."/gateways/{$this->_id}/icons/{$this->_id}.png") ?
-            LEYKA_PLUGIN_BASE_URL."/gateways/{$this->_id}/icons/{$this->_id}.png" : $this->_icon;
         $this->_icon = apply_filters(
             'leyka_icon_'.$this->_id,
-            $this->_icon ? : LEYKA_PLUGIN_BASE_URL.'/img/pm-icons/custom-payment-info.svg' // Unknown Gateway icon
+            file_exists(LEYKA_PLUGIN_DIR."/gateways/{$this->_id}/icons/{$this->_id}.png") ?
+                LEYKA_PLUGIN_BASE_URL."/gateways/{$this->_id}/icons/{$this->_id}.png" :
+                '' /** @todo Set an URL to the anonymous gateway icon?? */
         );
+
+        $this->_set_attributes(); // Initialize main Gateway's attributes
+
+        $this->_set_options_defaults(); // Set configurable options in admin area
+
+        $this->_set_gateway_pm_list(); // Initialize or restore Gateway's PMs list and all their options
 
         do_action('leyka_initialize_gateway', $this, $this->_id); // So one could change some of gateway's attributes
 
@@ -282,8 +246,6 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
         add_filter('leyka_'.$this->_id.'_get_unknown_donation_field', [$this, 'get_specific_data_value'], 10, 3);
         add_action('leyka_'.$this->_id.'_set_unknown_donation_field', [$this, 'set_specific_data_value'], 10, 3);
 
-        add_filter('leyka_'.$this->_id.'_get_donation_error_id', [$this, 'get_legacy_donation_error_id'], 10, 2);
-
         add_action('leyka_do_recurring_donation-'.$this->_id, [$this, 'do_recurring_donation']);
         add_filter(
             "leyka_{$this->_id}_recurring_subscription_cancelling_link",
@@ -294,8 +256,6 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
             "leyka_{$this->_id}_cancel_recurring_subscription_by_link",
             [$this, 'cancel_recurring_subscription_by_link']
         );
-
-        add_action("leyka_save_custom_option-{$this->_id}_active_currencies", [$this, "set_active_currencies"], 2, 10);
 
         $this->_initialize_options();
 
@@ -316,20 +276,13 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     public function __get($param) {
 
         switch($param) {
-            case 'id':
-            case 'ID':
-                return $this->_id;
-
+            case 'id': return $this->_id;
             case 'title':
             case 'name':
-            case 'label':
-                return $this->_title;
-
+            case 'label': return $this->_title;
             case 'description': return $this->_description;
-
             case 'icon':
             case 'icon_url':
-
                 $icon = false;
                 if($this->_icon) {
                     $icon = $this->_icon;
@@ -343,7 +296,6 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
             case 'has_recurring':
             case 'has_recurring_support':
                 return !!$this->_may_support_recurring;
-
             case 'has_recurring_auto_cancelling':
             case 'has_recurring_auto_cancelling_support':
                 return $this->_may_support_recurring && !!$this->_recurring_auto_cancelling_supported;
@@ -354,28 +306,14 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
             case 'docs':
             case 'docs_url':
             case 'docs_href':
-            case 'docs_link':
-                return $this->_docs_link ? : false;
-
+            case 'docs_link': return $this->_docs_link ? $this->_docs_link : false;
             case 'registration_url':
             case 'registration_href':
-            case 'registration_link':
-                return $this->_registration_link ? : false;
-
+            case 'registration_link': return $this->_registration_link ? $this->_registration_link : false;
             case 'has_wizard': return !!$this->_has_wizard;
             case 'wizard_url':
             case 'wizard_href':
-            case 'wizard_link':
-                return admin_url('admin.php?page=leyka_settings_new&screen=wizard-'.$this->_id);
-
-            case 'supported_currencies':
-                return $this->get_supported_currencies();
-
-            case 'supported_currencies_all':
-                return $this->get_supported_currencies(false);
-
-            case 'active_currencies':
-                return $this->_active_currencies;
+            case 'wizard_link': return admin_url('admin.php?page=leyka_settings_new&screen=wizard-'.$this->_id);
 
             default:
                 return false;
@@ -405,8 +343,6 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
         }
 
         $gateway_options_names = $this->get_options_names();
-        $gateway_options_names[] = $this->_id.'_active_currencies';
-
         if($gateway_section_index < 0) {
             $options[] = ['section' => [
                 'name' => $this->_id,
@@ -434,28 +370,9 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     public function enqueue_gateway_scripts() {
     }
 
-    abstract protected function _set_attributes(); // Attributes are constant, like Gateway id, title, etc.
+    abstract protected function _set_attributes(); // Attributes are constant, like id, title, etc.
     protected function _set_options_defaults() {} // Options are admin configurable parameters
     abstract protected function _initialize_pm_list(); // PM list is specific for each Gateway
-
-    /**
-     * A service method to:
-     * 1. Add Gateway specific errors to the Donations errors library via Leyka_Donations_Errors::get_instance()->add_error();
-     * 2. Initialize $this->_donations_errors_ids array.
-     */
-    protected function _set_donations_errors() {}
-
-    /**
-     * A special method to get Donation error ID from this Donation's Gateway response data -
-     * it's intended for all old Donations which don't have a dedicated 'error_id' meta value yet.
-     *
-     * @param $error_id string|false
-     * @param $donation Leyka_Donation_Base
-     * @return string|false
-     */
-    public function get_legacy_donation_error_id($error_id, Leyka_Donation_Base $donation) {
-        return $error_id;
-    }
 
     // Handler for Gateway's service calls (activate the donations, etc.):
     public function _handle_service_calls($call_type = '') {}
@@ -475,9 +392,10 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
             return false;
         }
 
-        $init_recurring_donation = $donation->init_recurring_donation;
+        $init_recurring_donation_id = $donation->get_meta('init_recurring_donation_id');
 
-        return $init_recurring_donation ? : $donation;
+        return $init_recurring_donation_id ?
+            Leyka_Donations::get_instance()->get_donation($init_recurring_donation_id) : $donation;
 
     }
 
@@ -488,9 +406,9 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
         if($init_recurring_donation) {
 
             $cancelling_url = (
-                    get_option('permalink_structure') ?
-                        home_url("leyka/service/cancel_recurring/{$donation->id}") :
-                        home_url("?page=leyka/service/cancel_recurring/{$donation->id}")
+                get_option('permalink_structure') ?
+                    home_url("leyka/service/cancel_recurring/{$donation->id}") :
+                    home_url("?page=leyka/service/cancel_recurring/{$donation->id}")
                 ).'/'.md5($donation->id.'_'.$init_recurring_donation->id.'_leyka_cancel_recurring_subscription');
 
             return sprintf(__('<a href="%s" target="_blank" rel="noopener noreferrer">click here</a>', 'leyka'), $cancelling_url);
@@ -570,17 +488,6 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     }
 
     protected function _initialize_options() {
-
-        if( !leyka_options()->option_exists($this->_id.'_active_currencies') ) {
-
-            leyka_options()->add_option($this->_id.'_active_currencies', 'custom_gw_active_currencies', [
-                'default' => $this->get_supported_currencies(),
-                'title' => __('Gateway supported currencies', 'leyka')
-            ]);
-
-        }
-
-        $this->_active_currencies = leyka_options()->opt_safe($this->_id.'_active_currencies') ?: [] ;
 
         foreach($this->_options as $option_name => $params) {
             if( !leyka_options()->option_exists($option_name) ) {
@@ -700,7 +607,7 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     /** @param Leyka_Payment_Method|string $pm A PM object or it's ID to remove from gateway. */
     public function remove_payment_method($pm) {
 
-        if($pm instanceof Leyka_Payment_Method) {
+        if(is_object($pm) && $pm instanceof Leyka_Payment_Method) {
             unset($this->_payment_methods[$pm->id]);
         } else if(strlen($pm) && !empty($this->_payment_methods[$pm])) {
             unset($this->_payment_methods[$pm->id]);
@@ -765,17 +672,6 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
         return empty($this->_payment_methods[$pm_id]) ? false : $this->_payment_methods[$pm_id];
     }
 
-    /**
-     * @param $gateway_error_id string Gateway system's Donation error ID/code
-     * @return string|false Leyka system's Donation error ID, or false if no match found
-     */
-    public function get_donation_error_id($gateway_error_id) {
-
-        return empty($this->_donations_errors_ids[$gateway_error_id]) ?
-            false : $this->_donations_errors_ids[$gateway_error_id];
-
-    }
-
     /** Default filter for the donation page redirect type parameter */
     public function submission_redirect_type($redirect_type, $pm_id, $donation_id) {
         return 'auto';
@@ -812,7 +708,7 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
     }
 
     /**
-     * @return array A list of possible values in leyka_get_gateways_filter_categories_list function
+     * @return array; list of possible values in leyka_get_gateways_filter_categories_list function
      */
     public function get_filter_categories() {
 
@@ -845,36 +741,21 @@ abstract class Leyka_Gateway extends Leyka_Singleton {
 
     }
 
-    public function get_supported_currencies($only_active_pms = false) {
-
-        $pms = $this->get_payment_methods($only_active_pms);
-
-        $supported_currencies = [];
-
-        /** @var $pm Leyka_Payment_Method */
-        foreach($pms as $pm) {
-
-            foreach($pm->currencies as $currency) {
-                $supported_currencies[] = $currency;
-            }
-
-        }
-
-        return array_unique($supported_currencies);
+    /**
+     * Get Gateway supported countries IDs as an array of countries IDs.
+     * @return mixed Either an array of supported countries IDs, or NULL if all countries supported.
+     */
+    public function get_countries() {
+        return empty($this->_countries) && !is_array($this->_countries) ? NULL : $this->_countries;
     }
 
-    public function set_active_currencies($data, $setting_id) {
+    public function is_country_supported($country_id = false) {
 
-        if( !is_array($data) ) {
-            $data = [];
-        }
+        $country_id = $country_id ? trim(esc_attr($country_id)) : leyka_options()->opt_safe('receiver_country');
+        $countries = $this->get_countries();
 
-        leyka_options()->opt($this->_id.'_active_currencies', $data);
+        return $countries ? in_array($country_id, $countries) : true;
 
-    }
-
-    public function is_currency_active($currency_id) {
-        return in_array($currency_id, $this->_active_currencies);
     }
 
 }
@@ -922,18 +803,10 @@ abstract class Leyka_Payment_Method extends Leyka_Singleton {
     public function __get($param) {
 
         switch($param) {
-            case 'id':
-                $param = $this->_id;
-                break;
-            case 'full_id':
-                $param = $this->_gateway_id.'-'.$this->_id;
-                break;
-            case 'gateway_id':
-                $param = $this->_gateway_id;
-                break;
-            case 'gateway':
-                $param = leyka_get_gateway_by_id($this->_gateway_id);
-                break;
+            case 'id': $param = $this->_id; break;
+            case 'full_id': $param = $this->_gateway_id.'-'.$this->_id; break;
+            case 'gateway_id': $param = $this->_gateway_id; break;
+            case 'gateway': $param = leyka_get_gateway_by_id($this->_gateway_id); break;
             case 'category':
             case 'category_id':
                 $param = array_key_exists($this->_category, leyka_get_pm_categories_list()) ? $this->_category : false;
@@ -942,13 +815,10 @@ abstract class Leyka_Payment_Method extends Leyka_Singleton {
                 $param = $this->category ? leyka_get_pm_category_label($this->_category) : '';
                 break;
             case 'category_icon':
-            case 'category_icon_url':
                 $param = $this->category ? LEYKA_PLUGIN_BASE_URL."img/pm-category-icons/{$this->_category}.svg" : '';
                 break;
             case 'active':
-            case 'is_active':
-                $param = $this->_active;
-                break;
+            case 'is_active': $param = $this->_active; break;
             case 'label':
             case 'title':
             case 'name':
@@ -957,66 +827,27 @@ abstract class Leyka_Payment_Method extends Leyka_Singleton {
                 break;
             case 'label_backend':
             case 'title_backend':
-            case 'name_backend': $param = $this->_label_backend ? : $this->_label;
+            case 'name_backend': $param = $this->_label_backend ? $this->_label_backend : $this->_label;
                 break;
             case 'desc':
-            case 'description':
-                $param = html_entity_decode($this->_description);
-                break;
-            case 'has_global_fields':
-                $param = $this->_support_global_fields;
-                break;
-            case 'specific_fields':
-                $param = $this->_specific_fields ? : [];
-                break;
-            case 'custom_fields':
-                $param = $this->_custom_fields ? : [];
-                break;
-
-            case 'icons':
-                $param = $this->_icons;
-                break;
-
+            case 'description': $param = html_entity_decode($this->_description); break;
+            case 'has_global_fields': $param = $this->_support_global_fields; break;
+            case 'specific_fields': $param = $this->_specific_fields ? $this->_specific_fields : []; break;
+            case 'custom_fields': $param = $this->_custom_fields ? $this->_custom_fields : []; break;
+            case 'icons': $param = $this->_icons; break;
             case 'main_icon':
-
-                $param = $this->_main_icon ? : 'pic-main-'.$this->full_id;
-                $param = apply_filters('leyka_pm_main_icon_name', $param, $this->_id, $this->_gateway_id);
-                $param = apply_filters('leyka_'.$this->full_id.'_pm_main_icon_name', $param);
-
+                $param = $this->_main_icon ? $this->_main_icon : 'pic-main-'.$this->full_id;
+                $param = apply_filters('leyka_pm_main_icon_name', $param, $this->_id);
+                $param = apply_filters('leyka_'.$this->_id.'_pm_main_icon_name', $param);
                 break;
-
             case 'main_icon_url':
-
-                $param = file_exists(LEYKA_PLUGIN_DIR."gateways/{$this->gateway_id}/icons/{$this->main_icon}.svg") ?
-                    LEYKA_PLUGIN_BASE_URL."gateways/{$this->gateway_id}/icons/{$this->main_icon}.svg" :
-                    $this->gateway->icon_url;
-
-                $param = apply_filters('leyka_pm_main_icon_url', $param, $this->_id, $this->_gateway_id);
-                $param = apply_filters('leyka_'.$this->full_id.'_pm_main_icon_url', $param);
-
+                $param = LEYKA_PLUGIN_BASE_URL."gateways/{$this->gateway_id}/icons/{$this->main_icon}.svg";
+                $param = apply_filters('leyka_pm_main_icon_url', $param, $this->_id);
+                $param = apply_filters('leyka_'.$this->_id.'_pm_main_icon_url', $param);
                 break;
-
-            case 'admin_icon_url':
-
-                $param = $this->category_id === 'bank_cards' ? $this->category_icon_url : $this->main_icon_url;
-                $param = apply_filters('leyka_pm_admin_icon_url', $param, $this->_id, $this->_gateway_id);
-                $param = apply_filters('leyka_'.$this->full_id.'_pm_admin_icon_url', $param);
-
-                break;
-
-            case 'admin_icon':
-                $param = basename($this->admin_icon_url);
-                break;
-
-            case 'submit_label':
-                $param = $this->_submit_label;
-                break;
-            case 'currencies':
-                $param = $this->_supported_currencies;
-                break;
-            case 'default_currency':
-                $param = $this->_default_currency;
-                break;
+            case 'submit_label': $param = $this->_submit_label; break;
+            case 'currencies': $param = $this->_supported_currencies; break;
+            case 'default_currency': $param = $this->_default_currency; break;
             case 'processing_type':
             case 'processing':
                 $param = $this->_processing_type;
@@ -1146,4 +977,4 @@ abstract class Leyka_Payment_Method extends Leyka_Singleton {
     /** For PM with a static processing type, this method should display some static data. Otherwise, it may stay empty. */
     public function display_static_data() {}
 
-} // Leyka_Payment_Method - END
+} // Leyka_Payment_Method end

@@ -94,24 +94,7 @@ if( !function_exists('leyka_pm_sortable_option_html_new') ) {
         $is_hidden = !!$is_hidden;
 
         $pm = leyka_get_pm_by_id($pm_full_id, true);
-
-        if( !$pm ) {
-            return false;
-        }
-
-        $gateway = $pm->gateway;
-        $available_currencies = [];
-
-        foreach($gateway->active_currencies as $gw_active_currency) {
-            if($pm->has_currency_support($gw_active_currency)) {
-
-                $currency_data = leyka_get_currencies_data($gw_active_currency);
-                $available_currencies[] = $currency_data['label'];
-
-            }
-        }
-
-        $available_currencies_list = !empty($available_currencies) ? implode(',', $available_currencies) : '';?>
+        $gateway = $pm ? $pm->gateway : false;?>
 
         <li class="pm-order" data-pm-id="<?php echo $pm_full_id;?>" <?php echo $is_hidden ? 'style="display:none;"' : '';?>>
 
@@ -120,18 +103,20 @@ if( !function_exists('leyka_pm_sortable_option_html_new') ) {
             <div class="pm-info">
 
                 <div class="pm-icons">
-                <?php if($pm->icons) {
-                    foreach($pm->icons as $icon_url) {?>
-                        <img class="pm-icon <?php echo $pm->full_id.' '.basename($icon_url, '.svg');?>" src="<?php echo $icon_url;?>" alt="">
+                <?php if($pm) {
+                    if($pm->icons) {
+                        foreach($pm->icons as $icon_url) {?>
+                            <img class="pm-icon <?php echo $pm->full_id.' '.basename($icon_url, '.svg');?>" src="<?php echo $icon_url;?>" alt="">
+                        <?php }
+                    } else if($pm->main_icon) {?>
+                        <img class="pm-icon <?php echo $pm->full_id.' '.basename($pm->main_icon_url, '.svg');?>" src="<?php echo $pm->main_icon_url;?>" alt="">
                     <?php }
-                } else if($pm->main_icon) {?>
-                    <img class="pm-icon <?php echo $pm->full_id.' '.basename($pm->main_icon_url, '.svg');?>" src="<?php echo $pm->main_icon_url;?>" alt="">
-                <?php }?>
+                }?>
                 </div>
 
                 <div class="pm-label-wrapper">
 
-                    <span class="pm-label" id="pm-label-<?php echo $pm_full_id;?>" data-currencies-list="<?php echo '('.$available_currencies_list.')';?>"><?php echo $pm->label;?> <b><?php echo '('.$available_currencies_list.')';?></b></span>
+                    <span class="pm-label" id="pm-label-<?php echo $pm_full_id;?>"><?php echo $pm_label;?></span>
 
                     <span class="pm-label-fields" style="display:none;">
 
@@ -306,92 +291,7 @@ if( !function_exists('leyka_is_settings_step_valid') ) {
             }
         }
 
-        return $options_invalid ? : true;
-
-    }
-}
-
-if( !function_exists('leyka_show_donation_error_full_info') ) {
-    function leyka_show_donation_error_full_info(Leyka_Donation_Error $error, $return = false) {
-
-        if( !!$return ) {
-            ob_start();
-        }?>
-
-        <div class="leyka-donation-error-details">
-
-            <h2 class="error-details-header error-name">
-                <i class="error-symbol"></i>
-                <span class="error-name-text"><?php echo $error->name;?></span>
-                <i class="close"></i>
-            </h2>
-
-            <div class="error-details">
-
-                <?php if($error->description) {?>
-                    <div class="error-description">
-
-                        <h3><?php _e('Error description', 'leyka');?></h3>
-
-                        <p><?php echo $error->description;?></p>
-
-                        <?php /** @todo Uncomment it when all the known errors will have descriptions on //leyka.te-st.ru/docs/donations-errors/ page */ /*?>
-                        <a href="<?php echo $error->docs_link;?>" target="_blank"><?php _e('Full description', 'leyka');?></a>
-                        <?php */?>
-
-                    </div>
-                <?php }
-
-                if($error->recommendation_admin) {?>
-                    <div class="error-recommendation error-recommendation-admin">
-
-                        <h3><?php _e('Recommendation', 'leyka');?></h3>
-
-                        <p><?php echo $error->recommendation_admin;?></p>
-
-                    </div>
-                <?php }?>
-
-                <p class="error-common-support-contact-info">
-                    <?php _e('Still has questions? Need help? Message us:', 'leyka');?>
-                    <br>
-                    <?php _e('— <a href="https://t.me/leykadev" target="_blank">Telegram-chat of the support service</a> or', 'leyka');?>
-                    <br>
-                    <?php _e('— <a href="https://leyka.te-st.ru/support/" target="_blank">make a feedaback post</a>.', 'leyka');?>
-                </p>
-
-            </div>
-
-            <div class="error-details-footer">
-
-                <div class="error-code">
-                    <?php _e('Error code:', 'leyka');?>&nbsp;<span class="leyka-copy-on-click"><?php echo $error->id;?></span>
-                </div>
-
-                <div class="errors-docs-link">
-                    <a href="<?php echo Leyka_Donations_Errors::get_instance()->all_errors_docs_link;?>" target="_blank">
-                        <?php _e('All errors', 'leyka');?>
-                    </a>
-                </div>
-
-            </div>
-
-            <div class="error-details-after-footer">
-                <button class="close"><?php _e('Understood', 'leyka');?></button>
-            </div>
-
-        </div>
-
-        <?php if( !!$return ) {
-
-            $out = ob_get_contents();
-            ob_end_clean();
-
-            return $out;
-
-        }
-
-        return NULL;
+        return $options_invalid ? $options_invalid : true;
 
     }
 }

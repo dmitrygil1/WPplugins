@@ -17,7 +17,7 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 		add_action('manage_'.self::$post_type.'_posts_custom_column', [$this, 'manage_columns_content'], 2, 2);
 		add_action('save_post', [$this, 'save_data'], 2, 2);
 
-        add_action('restrict_manage_posts', [$this, 'manage_admin_list_filters']);
+        add_action('restrict_manage_posts', [$this, 'manage_filters']);
         add_action('pre_get_posts', [$this, 'do_filtering']);
 
 		add_filter('post_row_actions', [$this, 'row_actions'], 10, 2);
@@ -86,65 +86,33 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 
     }
 
-    public function manage_admin_list_filters() {
+    public function manage_filters() {
 
-        $screen = get_current_screen();
+        if(get_current_screen()->id == 'edit-'.self::$post_type && current_user_can('leyka_manage_donations')) {?>
 
-        if( !is_admin() || !$screen || $screen->id != 'edit-'.self::$post_type || !current_user_can('leyka_manage_donations') ) {
-            return;
-        }?>
+            <label for="campaign-state-select"></label>
+            <select id="campaign-state-select" name="campaign_state">
+                <option value="all" <?php echo empty($_GET['campaign_state']) ? 'selected="selected"' : '';?>>
+                    - <?php _e('Collection state', 'leyka');?> -
+                </option>
+                <option value="is_finished" <?php echo !empty($_GET['campaign_state']) && $_GET['campaign_state'] == 'is_finished' ? 'selected="selected"' : '';?>><?php _e('Closed', 'leyka');?></option>
+                <option value="is_open" <?php echo !empty($_GET['campaign_state']) && $_GET['campaign_state'] == 'is_open' ? 'selected="selected"' : '';?>><?php _e('Opened', 'leyka');?></option>
 
-        <label for="campaign-state-select"></label>
-        <select id="campaign-state-select" name="campaign_state">
+            </select>
 
-            <option value="all" <?php echo empty($_GET['campaign_state']) ? 'selected="selected"' : '';?>>
-                - <?php _e('Collection state', 'leyka');?> -
-            </option>
+            <label for="target-state-select"></label>
+            <select id="target-state-select" name="target_state">
+                <option value="" <?php echo empty($_GET['target_state']) ? 'selected="selected"' : '';?>>
+                    - <?php _e('Target', 'leyka');?> -
+                </option>
 
-            <option value="is_finished" <?php echo !empty($_GET['campaign_state']) && $_GET['campaign_state'] == 'is_finished' ? 'selected="selected"' : '';?>><?php _e('Closed', 'leyka');?></option>
-
-            <option value="is_open" <?php echo !empty($_GET['campaign_state']) && $_GET['campaign_state'] == 'is_open' ? 'selected="selected"' : '';?>><?php _e('Opened', 'leyka');?></option>
-
-        </select>
-
-        <label for="target-state-select"></label>
-        <select id="target-state-select" name="target_state">
-
-            <option value="" <?php echo empty($_GET['target_state']) ? 'selected="selected"' : '';?>>
-                - <?php _e('Target', 'leyka');?> -
-            </option>
-
-            <?php foreach(Leyka::get_campaign_target_states() as $state => $label) {?>
-
-            <option value="<?php echo $state;?>" <?php echo !empty($_GET['target_state']) && $_GET['target_state'] == $state ? 'selected="selected"' : '';?>>
-                <?php echo $label;?>
-            </option>
-
-            <?php }?>
-
-        </select>
-
-    <?php if(leyka_options()->opt('campaign_categories_available')) {
-
-            global $wp_query;
-
-            $term = isset($wp_query->query[ Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME ]) ?
-                $wp_query->query[ Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME ] : '';
-
-            wp_dropdown_categories(array(
-                    'show_option_all' => __('All campaigns categories', 'leyka'),
-                    'taxonomy' => Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME,
-                    'name' => Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME,
-                    'orderby' => 'name',
-                    'selected' => $term,
-                    'hierarchical' => true,
-                    'depth' => 3,
-                    'show_count' => true,
-                    'hide_if_empty' => false,
-                )
-            );
-
-        }
+                <?php foreach(Leyka::get_campaign_target_states() as $state => $label) {?>
+                <option value="<?php echo $state;?>" <?php echo !empty($_GET['target_state']) && $_GET['target_state'] == $state ? 'selected="selected"' : '';?>>
+                    <?php echo $label;?>
+                </option>
+                <?php }?>
+            </select>
+    <?php }
 
     }
 
@@ -174,20 +142,6 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 
         if(count($meta_query) > 1) {
             $query->set('meta_query', $meta_query);
-        }
-
-        if(
-            !empty($_REQUEST[Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME])
-            && absint($_REQUEST[Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME])
-        ) {
-
-            $query->set(Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME, false);
-            $query->set('tax_query', [[
-                'taxonomy' => Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME,
-                'field' => 'term_id',
-                'terms' => [absint($_REQUEST[Leyka_Campaign::CAMPAIGNS_CATEGORIES_TAXONOMY_NAME])],
-            ]]);
-
         }
 
     }
@@ -844,6 +798,8 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
      */
     public function payments_amounts_metabox(WP_Post $campaign) {
 
+        $main_currency_id = leyka_get_country_currency();
+
         $payments_amounts_section = [
             'name' => 'payments_options',
             'content_area_render' => 'leyka_render_tabbed_section_options_area',
@@ -854,14 +810,14 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
                     'title' => __('Single payment', 'leyka'),
                     'sections' => [
                         ['title' => '', 'options' => ['payments_single_tab_title']],
-                        ['title' => '', 'options' => ['payments_single_amounts_options']]
+                        ['title' => '', 'options' => ['payments_single_amounts_options_'.$main_currency_id]]
                     ]
                 ],
                 'recurring' => [
                     'title' => __('Recurring payment', 'leyka'),
                     'sections' => [
                         ['title' => '', 'options' => ['payments_recurring_tab_title']],
-                        ['title' => '', 'options' => ['payments_recurring_amounts_options']]
+                        ['title' => '', 'options' => ['payments_recurring_amounts_options_'.$main_currency_id]]
                     ]
                 ]
             ]
@@ -870,24 +826,11 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
         $campaign = new Leyka_Campaign($campaign->ID);
 
         if ( $campaign->default_payments_amounts === '0' ) {
-
-            $payments_amounts_forced_options = ['payments_single_tab_title', 'payments_recurring_tab_title'];
-
-            foreach($payments_amounts_forced_options as $forced_option) {
+            foreach(['payments_single_tab_title', 'payments_single_amounts_options_'.$main_currency_id,
+                        'payments_recurring_tab_title', 'payments_recurring_amounts_options_'.$main_currency_id]
+                    as $forced_option) {
                 $forced_options_data[$forced_option] = ['value' => $campaign->$forced_option];
             }
-
-            $currencies = array_keys(leyka_get_main_currencies_full_info());
-
-            foreach ($currencies as $currency_id) {
-
-                $forced_options_data['payments_single_amounts_options']['value']['payments_single_amounts_options_'.$currency_id]
-                    = ['value' => $campaign->{'payments_single_amounts_options_'.$currency_id}];
-                $forced_options_data['payments_recurring_amounts_options']['value']['payments_recurring_amounts_options_'.$currency_id]
-                    = ['value' => $campaign->{'payments_recurring_amounts_options_'.$currency_id}];
-
-            }
-
         }
 
         ?>
@@ -909,8 +852,6 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
             </fieldset>
 
             <div class="leyka-options-section" style="<?php echo $campaign->default_payments_amounts === '1' ? 'display:none;' : '' ?>"><?php leyka_render_tabbed_section_options_area($payments_amounts_section, isset($forced_options_data) ? $forced_options_data : []); ?></div>
-
-
         </div>
 
     <?php  }
@@ -1028,24 +969,6 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 
                                     <li class="edit-field-note">
                                         <?php echo sprintf(__('If you wish to edit the field settings, you may do it in <a href="%s" target="_blank">fields library</a>.', 'leyka'), admin_url('admin.php?page=leyka_settings&stage=view#'.$placeholders['id']));?>
-                                    </li>
-
-                                    <li class="any-field-note email-placeholder-note">
-
-                                        <?php _e('Placeholder for this field title in emails:', 'leyka');?>
-                                        <span class="email-placeholder-value leyka-copy-on-click">
-                                            <?php echo '#ADDITIONAL_FIELD_TITLE_'.$placeholders['id'].'#';?>
-                                        </span>
-
-                                    </li>
-
-                                    <li class="any-field-note email-placeholder-note">
-
-                                        <?php _e('Placeholder for this field value in emails:', 'leyka');?>
-                                        <span class="email-placeholder-value leyka-copy-on-click">
-                                            <?php echo '#ADDITIONAL_FIELD_VALUE_'.$placeholders['id'].'#';?>
-                                        </span>
-
                                     </li>
 
                                 <?php if($placeholders['for_all_campaigns']) {?>
@@ -1194,7 +1117,7 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
      */
     public function donations_metabox(WP_Post $campaign) {
 
-        $campaign = new Leyka_Campaign($campaign); ?>
+        $campaign = new Leyka_Campaign($campaign);?>
 
         <div>
             <a class="button" href="<?php echo admin_url('admin.php?page=leyka_donation_info&campaign_id='.$campaign->id);?>"><?php _e('Add correctional donation', 'leyka');?></a>
@@ -1349,7 +1272,7 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 
             $meta['default_payments_amounts'] = $_REQUEST['leyka_default_payments_amounts'];
 
-            $currencies = array_keys(leyka_get_main_currencies_full_info());
+            $currency_id = leyka_options()->opt_safe("currency_main");
 
             if($meta['default_payments_amounts'] === '0') {
 
@@ -1380,35 +1303,26 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 
                 }
 
-                foreach($currencies as $currency_id) {
+                if(isset($_REQUEST['leyka_payments_single_amounts_options_'.$currency_id])) {
+                    $meta['payments_single_amounts_options_'.$currency_id] = prepare_payment_amounts_options(
+                        json_decode(urldecode($_REQUEST['leyka_payments_single_amounts_options_'.$currency_id]), true),
+                        'single'
+                    );
+                }
 
-                    if(isset($_REQUEST['leyka_payments_single_amounts_options_'.$currency_id])) {
-                        $meta['payments_single_amounts_options_'.$currency_id] = prepare_payment_amounts_options(
-                            json_decode(urldecode($_REQUEST['leyka_payments_single_amounts_options_'.$currency_id]), true),
-                            'single'
-                        );
-                    }
-
-                    if(isset($_REQUEST['leyka_payments_recurring_amounts_options_'.$currency_id])) {
-                        $meta['payments_recurring_amounts_options_'.$currency_id] = prepare_payment_amounts_options(
-                            json_decode(urldecode($_REQUEST['leyka_payments_recurring_amounts_options_'.$currency_id]), true),
-                            'recurring'
-                        );
-                    }
-
+                if(isset($_REQUEST['leyka_payments_recurring_amounts_options_'.$currency_id])) {
+                    $meta['payments_recurring_amounts_options_'.$currency_id] = prepare_payment_amounts_options(
+                        json_decode(urldecode($_REQUEST['leyka_payments_recurring_amounts_options_'.$currency_id]), true),
+                        'recurring'
+                    );
                 }
 
             } else {
 
                 delete_post_meta($campaign_id, 'payments_single_tab_title');
+                delete_post_meta($campaign_id, 'payments_single_amounts_options_'.$currency_id);
                 delete_post_meta($campaign_id, 'payments_recurring_tab_title');
-
-                foreach($currencies as $currency_id) {
-
-                    delete_post_meta($campaign_id, ['payments_single_amounts_options_'.$currency_id]);
-                    delete_post_meta($campaign_id, ['payments_recurring_amounts_options_'.$currency_id]);
-
-                }
+                delete_post_meta($campaign_id, 'payments_recurring_amounts_options_'.$currency_id);
 
             }
 
@@ -1464,7 +1378,8 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
                 leyka_options()->opt('additional_donation_form_fields_library', $fields_library);
             }
 
-            if($updated_additional_fields_settings != $campaign->additional_fields_settings && !empty($fields_library) ) {
+            if($updated_additional_fields_settings != $campaign->additional_fields_settings) {
+
                 // If some Additional fields are removed from Campaign, remove the Campaign ID from their settings in the Library:
                 $fields_removed = false;
                 foreach($campaign->additional_fields_settings as $field_id) {
@@ -1567,6 +1482,7 @@ class Leyka_Campaign_Management extends Leyka_Singleton {
 				'<span class="c-opened">'.__('Opened', 'leyka').'</span>';
 
 		} else if($column_name === 'target') {
+
 			if($campaign->target_state === 'no_target') {
 				leyka_fake_scale_ultra($campaign);
 			} else {
@@ -1591,8 +1507,6 @@ class Leyka_Campaign {
 	protected $_id;
     protected $_post_object;
     protected $_campaign_meta;
-
-    const CAMPAIGNS_CATEGORIES_TAXONOMY_NAME = 'campaign_category'; // Not in the Management class - it's admin area only
 
 	public function __construct($campaign) {
 
@@ -1655,9 +1569,10 @@ class Leyka_Campaign {
                 $sum = 0.0;
                 foreach($this->get_donations(['funded']) as $donation) {
 
-                    $donation_amount = strtolower($donation->main_currency) === leyka_get_main_currency() ?
-                        $donation->main_currency_total_amount ?: $donation->main_currency_amount :
-                        leyka_currency_convert($donation->amount, strtolower($donation->currency));
+                    $donation_amount = $donation->main_curr_amount ? $donation->main_curr_amount : $donation->amount;
+                    if(is_array($donation_amount) && !empty($donation_amount[0]) && (float)$donation_amount[0] >= 0.0) {
+                        $donation_amount = $donation_amount[0];
+                    }
 
                     $sum += $donation_amount;
 
@@ -1712,15 +1627,6 @@ class Leyka_Campaign {
 
             }
 
-            if( !isset($meta['campaign_currency']) ) {
-
-                $currency = leyka_get_main_currency();
-
-                update_post_meta($this->_id, 'campaign_currency', $currency);
-                $meta['campaign_currency'] = $currency;
-
-            }
-
             $ignore_view_settings = empty($meta['ignore_global_template']) || !$meta['ignore_global_template'][0];
             $ignore_view_settings = apply_filters(
                 'leyka_campaign_ignore_view_settings',
@@ -1731,7 +1637,9 @@ class Leyka_Campaign {
 
             do_action('leyka_campaign_constructor_meta', $meta, $this->_id);
 
-            $campaign_meta = [
+            $main_currency_id = leyka_get_country_currency();
+
+            $this->_campaign_meta = apply_filters('leyka_campaign_constructor_meta', [
                 'payment_title' => empty($meta['payment_title']) ?
                     (empty($this->_post_object) ? '' : $this->_post_object->post_title) : $meta['payment_title'][0],
                 'campaign_type' => empty($meta['campaign_type']) ? '-' : $meta['campaign_type'][0],
@@ -1745,8 +1653,8 @@ class Leyka_Campaign {
                 'ignore_global_template' => $ignore_view_settings,
                 'is_finished' => $meta['is_finished'] ? $meta['is_finished'][0] > 0 : 0,
                 'form_content_position' => empty($meta['form_content_position'])
-                || !in_array($meta['form_content_position'][0], ['before-content', 'after-content']) ?
-                    'before-content' : $meta['form_content_position'][0],
+                    || !in_array($meta['form_content_position'][0], ['before-content', 'after-content']) ?
+                        'before-content' : $meta['form_content_position'][0],
                 'target_reaching_mailout_sent' => $meta['_leyka_target_reaching_mailout_sent'][0],
                 'target_reaching_mailout_errors' => $meta['_leyka_target_reaching_mailout_errors'][0],
                 'date_target_reached' => empty($meta['date_target_reached']) ? 0 : $meta['date_target_reached'][0],
@@ -1765,25 +1673,14 @@ class Leyka_Campaign {
                 'default_payments_amounts' => !isset($meta['default_payments_amounts']) ? '1' :
                     (is_array($meta['default_payments_amounts']) ? $meta['default_payments_amounts'][0] : $meta['default_payments_amounts']),
                 'payments_single_tab_title' => empty($meta['payments_single_tab_title']) ? '' : $meta['payments_single_tab_title'][0],
+                'payments_single_amounts_options_'.$main_currency_id => empty($meta['payments_single_amounts_options_'.$main_currency_id]) ?
+                    [] : maybe_unserialize($meta['payments_single_amounts_options_'.$main_currency_id][0]),
                 'payments_recurring_tab_title' => empty($meta['payments_recurring_tab_title']) ? '' : $meta['payments_recurring_tab_title'][0],
+                'payments_recurring_amounts_options_'.$main_currency_id => empty($meta['payments_recurring_amounts_options_'.$main_currency_id]) ?
+                    [] : maybe_unserialize($meta['payments_recurring_amounts_options_'.$main_currency_id][0]),
                 'additional_fields_settings' => empty($meta['leyka_campaign_additional_fields_settings']) ?
                     [] : maybe_unserialize($meta['leyka_campaign_additional_fields_settings'][0]),
-                'campaign_currency' => empty($meta['campaign_currency']) ? leyka_get_main_currency() : $meta['campaign_currency'][0]
-            ];
-
-            $currencies = array_keys(leyka_get_currencies_full_info());
-
-            foreach($currencies as $currency_id) {
-
-                $campaign_meta['payments_single_amounts_options_'.$currency_id] = empty($meta['payments_single_amounts_options_'.$currency_id]) ?
-                    [] : maybe_unserialize($meta['payments_single_amounts_options_'.$currency_id][0]);
-
-                $campaign_meta['payments_recurring_amounts_options_'.$currency_id] = empty($meta['payments_recurring_amounts_options_'.$currency_id]) ?
-                    [] : maybe_unserialize($meta['payments_recurring_amounts_options_'.$currency_id][0]);
-
-            }
-
-            $this->_campaign_meta = apply_filters('leyka_campaign_constructor_meta', $campaign_meta, $this->_id);
+            ], $this->_id);
 
         }
 
@@ -1878,17 +1775,7 @@ class Leyka_Campaign {
 
     public function __get($field) {
 
-        $currencies = array_keys(leyka_get_currencies_full_info());
-
-        foreach($currencies as $currency_id) {
-
-            if($field === 'payments_single_amounts_options_'.$currency_id) {
-                return $this->_campaign_meta['payments_single_amounts_options_'.$currency_id];
-            } else if($field === 'payments_recurring_amounts_options_'.$currency_id) {
-                return $this->_campaign_meta['payments_recurring_amounts_options_'.$currency_id];
-            }
-
-        }
+        $currency_id = leyka_get_country_currency();
 
         switch($field) {
             case 'id':
@@ -2043,11 +1930,13 @@ class Leyka_Campaign {
 
             case 'payments_single_tab_title': return $this->_campaign_meta['payments_single_tab_title'];
 
+            case 'payments_single_amounts_options_'.$currency_id:
+                return $this->_campaign_meta['payments_single_amounts_options_'.$currency_id];
+
             case 'payments_recurring_tab_title': return $this->_campaign_meta['payments_recurring_tab_title'];
 
-            case 'currency':
-            case 'campaign_currency':
-                return $this->_campaign_meta['campaign_currency'];
+            case 'payments_recurring_amounts_options_'.$currency_id:
+                return $this->_campaign_meta['payments_recurring_amounts_options_'.$currency_id];
 
             default:
                 return apply_filters('leyka_get_unknown_campaign_field', null, $field, $this);
@@ -2112,27 +2001,6 @@ class Leyka_Campaign {
             case 'additional_fields_settings':
                 $this->_campaign_meta['additional_fields_settings'] = $value;
                 update_post_meta($this->_id, 'leyka_campaign_additional_fields_settings', $value);
-                break;
-
-            case 'target':
-            case 'campaign_target':
-
-                $this->_campaign_meta['campaign_target'] = $value;
-                update_post_meta($this->_id, 'campaign_target', $value);
-                break;
-
-            case 'currency':
-            case 'campaign_currency':
-
-                $this->_campaign_meta['campaign_currency'] = $value;
-                update_post_meta($this->_id, 'campaign_currency', $value);
-                break;
-
-            case 'total_funded':
-            case 'campaign_total_funded':
-
-                $this->_campaign_meta['total_funded'] = $value;
-                update_post_meta($this->_id, 'total_funded', $value);
                 break;
 
             default:
@@ -2305,20 +2173,12 @@ class Leyka_Campaign {
 
         $total_amount = 0.0;
 
-        // Old version of calculation. WARNING: ineffective in case of MANY Donations:
-        foreach($this->get_donations(['funded']) as $donation) {
-
-            $donation_amount = $donation->main_currency_id === leyka_get_main_currency(true) ?
-                ($donation->main_currency_total_amount ?: $donation->main_currency_amount) :
-                leyka_currency_convert($donation->total_amount ?: $donation->amount, $donation->currency_id);
-
-            $total_amount += round($donation_amount, 2);
-
+        foreach($this->get_donations(['funded']) as $donation) { // Old ver. Ineffective in case of MANY Donations
+            $total_amount += $donation->sum_total;
         }
 
         return $total_amount;
 
-        // New version of calculation:
         /** @todo The MySQL functions are ready (see /private/leyka_mysql_functions.sql), but need to add & debug dbDelta() call for their creation on plugin update to 4.0. */
 
 //        global $wpdb;
@@ -2339,7 +2199,12 @@ class Leyka_Campaign {
     public function update_total_funded_amount($donation = false, $action = '', $old_sum = false) {
 
         if( !$donation ) { // Recalculate total collected amount for a campaign and recache it
-            $this->total_funded = $this->_get_calculated_total_funded_amount();
+
+            $sum = $this->_get_calculated_total_funded_amount();
+
+            $this->_campaign_meta['total_funded'] = $sum;
+            update_post_meta($this->_id, 'total_funded', $this->_campaign_meta['total_funded']);
+
         } else { // Add/subtract a sum of a donation from its campaign metadata
 
             $donation = Leyka_Donations::get_instance()->get_donation($donation);
@@ -2348,12 +2213,8 @@ class Leyka_Campaign {
                 return false;
             }
 
-            $donation_total_amount = round(strtolower($donation->main_currency) === leyka_get_main_currency() ?
-                $donation->main_currency_total_amount ?: $donation->main_currency_amount :
-                leyka_currency_convert($donation->total_amount ?: $donation->amount, strtolower($donation->currency)), 2);
-
             if($action === 'remove') { // Subtract given donation's sum from campaign's total_funded
-                $sum = -$donation_total_amount;
+                $sum = -$donation->sum_total;
             } else { // Add given donation sum to campaign's total_funded
 
                 $old_sum = $old_sum && (float)$old_sum ? round($old_sum, 2) : 0.0;
@@ -2361,8 +2222,8 @@ class Leyka_Campaign {
                     $this->_campaign_meta['total_funded'] -= (int)$old_sum;
                 }
 
-                $sum = ($donation->status != 'funded' || $donation->campaign_id != $this->_id) && $donation_total_amount > 0 ?
-                    -$donation_total_amount : $donation_total_amount;
+                $sum = ($donation->status != 'funded' || $donation->campaign_id != $this->_id) && $donation->sum_total > 0 ?
+                    -$donation->sum_total : $donation->sum_total;
                 $sum = $donation->status == 'trash' ? -$sum : $sum;
 
             }

@@ -294,7 +294,6 @@ class Leyka_Chronopay_Gateway extends Leyka_Gateway {
                         'init_recurring_donation' => $init_recurring_donation->id,
                         'chronopay_customer_id' => $customer_id,
                         'chronopay_transaction_id' => $transaction_id,
-                        'date' => '' // don't copy the date
                     ],
                     ['recalculate_total_amount' => true,]
                 );
@@ -307,13 +306,11 @@ class Leyka_Chronopay_Gateway extends Leyka_Gateway {
 
             }
 
-            do_action('leyka_new_rebill_donation_added', $donation);
-
         } else if( // Single payment. For now, processing is just like initial rebills
             leyka_options()->opt('chronopay_card_product_id_'.$_POST['currency'])
             && $_POST['product_id'] == leyka_options()->opt('chronopay_card_product_id_'.$_POST['currency'])
         ) {
-            if($donation->status !== 'funded') {
+            if($donation->status != 'funded') {
 
                 $donation->add_gateway_response($_POST);
                 $donation->status = 'funded';
@@ -619,7 +616,6 @@ class Leyka_Chronopay_Card extends Leyka_Payment_Method {
         ]);
 
         $this->_submit_label = __('Donate', 'leyka');
-        $this->_supported_currencies = [];
         $this->_default_currency = 'rub';
 
     }

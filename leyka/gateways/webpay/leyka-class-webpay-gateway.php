@@ -25,6 +25,7 @@ class Leyka_Webpay_Gateway extends Leyka_Gateway {
         $this->_min_commission = 2.8;
         $this->_receiver_types = ['legal'];
         $this->_may_support_recurring = true;
+        $this->_countries = ['by',];
 
     }
 
@@ -102,8 +103,7 @@ class Leyka_Webpay_Gateway extends Leyka_Gateway {
 
         $seed = time();
         $is_test_mode = leyka_options()->opt('webpay_test_mode') ? '1' : '0';
-        $currency_id = !empty($_POST['leyka_donation_currency']) ?
-            strtoupper($_POST['leyka_donation_currency']) : strtoupper($this->get_supported_currencies()[0]);
+        $currency_id = mb_strtoupper(leyka_options()->opt('currency_main'));
 
         $data = [];
 
@@ -275,10 +275,6 @@ class Leyka_Webpay_Gateway extends Leyka_Gateway {
             Leyka_Donation_Management::send_all_emails($donation->id);
         } else if($donation->status === 'failed') { // Emails will be sent only if respective options are on
             Leyka_Donation_Management::send_error_notifications($donation);
-        }
-
-        if($donation->type === 'rebill') {
-            do_action('leyka_new_rebill_donation_added', $donation);
         }
 
         if( // GUA direct integration - "purchase" event:
@@ -608,7 +604,7 @@ class Leyka_Webpay_Gateway extends Leyka_Gateway {
 
         $seed = time();
         $is_test_mode = leyka_options()->opt('webpay_test_mode') ? '1' : '0';
-        $currency_id = mb_strtoupper($init_recurring_donation->currency_id);
+        $currency_id = mb_strtoupper(leyka_options()->opt('currency_main'));
 
         $signature = sha1(
             $seed.leyka_options()->opt($this->_id.'_store_id').$init_recurring_donation->webpay_customer_id
@@ -705,7 +701,7 @@ class Leyka_Webpay_Card extends Leyka_Payment_Method {
             LEYKA_PLUGIN_BASE_URL.'img/pm-icons/card-maestro.svg',
         ]);
 
-        $this->_supported_currencies = ['byn', 'usd', 'eur', 'rub'];
+        $this->_supported_currencies[] = 'byn';
         $this->_default_currency = 'byn';
 
     }

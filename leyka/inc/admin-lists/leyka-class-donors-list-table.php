@@ -454,7 +454,7 @@ class Leyka_Admin_Donors_List_Table extends WP_List_Table {
     public function column_donor($item) {
 
         $item['donor_id'] = absint($item['donor_id']);
-        $admin_donor_page = admin_url('admin.php?page=leyka_donor_info&donor='.$item['donor_id']);
+        $admin_donor_page = admin_url('?page=leyka_donor_info&donor='.$item['donor_id']);
 
         $donor_data_html = apply_filters(
             'leyka_admin_donor_donor_column_content',
@@ -699,7 +699,7 @@ class Leyka_Admin_Donors_List_Table extends WP_List_Table {
                     )
                 .'</span>'
                 .'<div class="first-sub-row">'
-                    .'<span class="leyka-donation-amount">'.leyka_format_amount($donation->main_currency_amount).'&nbsp;'.leyka_get_currency_label().',</span>'
+                    .'<span class="leyka-donation-amount">'.leyka_format_amount($donation->amount).'&nbsp;'.$donation->currency_label.',</span>'
                     .'<span class="leyka-donation-date">'.$donation->date_time_label.'</span>'
                 .'</div>'
                 .'<div class="second-sub-row">«'.$donation->campaign_title.'»</div>';

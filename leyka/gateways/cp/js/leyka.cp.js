@@ -40,14 +40,8 @@ jQuery(document).ready(function($){
         // Donation form validation already passed in the main script (public.js)
 
         let is_recurring = $form.find('.leyka-recurring').prop('checked') ||
-                           $form.find('.is-recurring-chosen').val() > 0; // For Revo template;
-
-        const $_form = $form.clone(),
-            currency = $('.section__fields.currencies a.active').data('currency');
-
-        $_form.find(`.currency-tab:not(.currency-${currency})`).remove();
-
-        let data_array = $_form.serializeArray(),
+                           $form.find('.is-recurring-chosen').val() > 0, // For Revo template
+            data_array = $form.serializeArray(),
             data = {action: 'leyka_ajax_get_gateway_redirect_data'};
 
         for(let i = 0; i < data_array.length; i++) {
@@ -108,13 +102,7 @@ jQuery(document).ready(function($){
             }
 
             let widget = new cp.CloudPayments(),
-                data = {name: response.name, donor_name: response.name};
-
-            if(response.additional_fields && !$.isEmptyObject(response.additional_fields)) {
-                $.each(response.additional_fields, function(key, value){
-                    data[key] = value;
-                });
-            }
+                data = {};
 
             if(is_recurring) {
                 data.cloudPayments = {recurrent: {interval: 'Month', period: 1}};
@@ -132,7 +120,6 @@ jQuery(document).ready(function($){
                 currency: response.currency,
                 invoiceId: parseInt(response.donation_id),
                 accountId: response.donor_email,
-                // name: response.name,
                 email: response.donor_email,
                 data: data
             }, function(options){ // success callback

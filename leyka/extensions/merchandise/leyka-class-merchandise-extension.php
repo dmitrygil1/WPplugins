@@ -295,13 +295,8 @@ class Leyka_Merchandise_Extension extends Leyka_Extension {
             $this->_id.'-front',
             self::get_base_url().'/assets/js/public.js',
             ['jquery'],
-            defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY ? uniqid() : null,
-            true
+            defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY ? uniqid() : null
         );
-
-        wp_localize_script($this->_id.'-front', 'leyka_'.str_replace('leyka_', '', $this->_id).'_front', [
-            'currency_main' => leyka_options()->opt('currency_main'),
-        ]);
 
     }
 

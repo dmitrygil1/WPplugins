@@ -217,10 +217,10 @@ function leyka_empty(mixed_var) {
 /**
  * Number.prototype.format(decimal_length, section_length, sections_delimiter, decimal_delimiter)
  *
- * @param decimal_length integer The length of decimal
- * @param section_length integer length of whole part
- * @param sections_delimiter mixed sections delimiter
- * @param decimal_delimiter mixed decimal delimiter
+ * @param integer decimal_length The length of decimal
+ * @param integer section_length: length of whole part
+ * @param mixed   sections_delimiter: sections delimiter
+ * @param mixed   decimal_delimiter: decimal delimiter
  */
 Number.prototype.format = function(decimal_length, section_length, sections_delimiter, decimal_delimiter) {
 
@@ -1095,10 +1095,9 @@ var leykaValidateForm,
 
 	leykaValidateForm = function($_form){
 
-		let $currency_tab = $_form.find('.currency-tab:not(.leyka-hidden)'),
-            is_valid = true,
+		var is_valid = true,
 			email = $.trim($_form.find('.donor__textfield--email input').val()),
-			$amount_field = $currency_tab.find('.amount__figure input.leyka_donation_amount'),
+			$amount_field = $_form.find('.amount__figure input.leyka_donation_amount'),
 			amount = parseInt($amount_field.val().replace(/\s/g, '')),
 			$comment_filed = $_form.find(':input.leyka-donor-comment'),
 			$agree_terms = $_form.find('.donor__oferta input[name="leyka_agree"]'),
@@ -1108,14 +1107,14 @@ var leykaValidateForm,
 		if($current_field.val().length === 0 || !leyka_validate_donor_name($current_field.val())) {
 
             is_valid = false;
-            $_form.find('.donor__textfield--name').addClass('invalid');
+			$_form.find('.donor__textfield--name').addClass('invalid');
 
 		}
 
 		if(email.length === 0 || !is_email(email)) {
 
             is_valid = false;
-            $_form.find('.donor__textfield--email').addClass('invalid');
+			$_form.find('.donor__textfield--email').addClass('invalid');
 
 		}
 
@@ -1126,7 +1125,7 @@ var leykaValidateForm,
 		) {
 
             is_valid = false;
-            $_form.find('.donor__textfield--comment').addClass('invalid');
+			$_form.find('.donor__textfield--comment').addClass('invalid');
 
 		}
 
@@ -1136,7 +1135,7 @@ var leykaValidateForm,
 		) {
 
             is_valid = false;
-            $_form.find('.donor__oferta').addClass('invalid');
+			$_form.find('.donor__oferta').addClass('invalid');
 
 		}
 
@@ -1449,7 +1448,7 @@ var leykaValidateForm,
 
     function bindNavigationEvents() {
         
-        $('.leyka-js-another-step').on('click.leyka', function(e){
+        $('.leyka-js-another-step').on('click', function(e){
             e.preventDefault();
             goAnotherStep($(this));
         });
@@ -1458,15 +1457,14 @@ var leykaValidateForm,
             $(this).closest('.leyka-pf').leykaForm('close');
         });
 
-        $('.leyka-submit-errors').on('click.leyka', function(e){
-
-            if($(e.target).is('a')) { // Click on links inside an error message shouldn't close it
-                return;
-            }
+        //if it's should be here
+        $('.leyka-submit-errors').on('click', function(e){
 
             e.preventDefault();
 
-            $(this).hide();
+            var $this = $(this);
+
+            $this.hide();
             goFirstStep();
 
         });
@@ -2160,7 +2158,6 @@ jQuery(document).ready(function($){
 jQuery(document).ready(function($){
 
     function init() {
-        assignSizeClasses();
 		bindEvents();
     }
 
@@ -2177,30 +2174,42 @@ jQuery(document).ready(function($){
 
         // Window resize events:
         $(window).on('resize.leyka', function(){
-            assignSizeClasses();
-            setupSwiperWidth($('.leyka-pf-need-help'));
+            $('.full-list.equalize-elements-width').each(function(){
+                equalizeFormElementsWidth($(this));
+            });
         }).resize();
 
     }
 
-    function assignSizeClasses() {
+    function equalizeFormElementsWidth($elements_wrapper){
 
-        let $form = $('.leyka-pf-need-help'),
-            form_parent_width = Math.ceil($form.parent().width());
+        let width = 0,
+            wrapper_width = $elements_wrapper.innerWidth()
+                - Math.abs(parseInt($elements_wrapper.css('margin-left')))
+                - Math.abs(parseInt($elements_wrapper.css('margin-right'))),
+            $elements = $elements_wrapper
+                .children(':not('+$elements_wrapper.data('equalize-elements-exceptions')+'):not(.disabled):visible');
 
-        $form.removeClass('leyka-width-small leyka-width-medium leyka-width-large leyka-width-exlarge leyka-width-xxlarge');
+        $elements.each(function(){
 
-        if(form_parent_width <= (320 + 20 - 1)) {
-            $form.addClass('leyka-width-small');
-        } else if(form_parent_width <= (600 + 20 - 1)) {
-            $form.addClass('leyka-width-medium');
-        } else if(form_parent_width <= (760 + 20 - 1)) {
-            $form.addClass('leyka-width-large');
-        } else if(form_parent_width <= (1020 + 20 - 1)) {
-            $form.addClass('leyka-width-exlarge');
-        } else {
-            $form.addClass('leyka-width-xxlarge');
-        }
+            let $element = jQuery(this);
+
+            if(wrapper_width / $elements.length > 230) { // Element total width: 220 is the basis, 10 is the margin
+
+                $element.removeProp('style'); // If elements are few, let them just stretch to fit in one line
+                return;
+
+            }
+
+            if( !width ) {
+                width = $element.outerWidth();
+            }
+
+            if($element.outerWidth() !== width) {
+                $element.css('flex', width+'px 0 1');
+            }
+
+        });
 
     }
 	
@@ -2334,38 +2343,23 @@ jQuery(document).ready(function($){
 
     }
 
-    function showAmountOptionsByPaymentType($_form, payment_type) {
+    function showAmountOptionsByPaymentType($form, payment_type) {
 
-        if($_form.find('.daily-rouble-comment:visible').length) {
-            payment_type = 'daily_rouble';
-        }
+        $form.find(`.section--amount .swiper-item`).removeClass('selected');
+        $form.find(`.section--amount .swiper-item:not(.flex-amount-item)`).css('display', 'none');
+        $form.find(`.section--amount .swiper-item[data-payment-type="${payment_type}"]`).css('display', 'block');
 
-        const currency = $('.section__fields.currencies a.active').data('currency'),
-            $currency_tab = $(`.currency-tab.currency-${currency}`),
-            $swiper_first_item = payment_type === 'daily_rouble' ?
-                $currency_tab.find('.section--amount .swiper-item:first') :
-                $currency_tab.find(`.section--amount .swiper-item[data-payment-type="${payment_type}"]`).first();
-
-        if(payment_type !== 'daily_rouble') {
-
-            $currency_tab.find(`.section--amount .swiper-item`).removeClass('selected');
-            $currency_tab.find(`.section--amount .swiper-item:not(.flex-amount-item)`).css('display', 'none');
-            $currency_tab.find(`.section--amount .swiper-item[data-payment-type="${payment_type}"]`).css('display', 'block');
-
-        }
-
+        let $swiper_first_item = $(`.section--amount .swiper-item[data-payment-type="${payment_type}"]`).first();
         $swiper_first_item.first().addClass('selected');
 
-        setAmountInputValue($_form, $swiper_first_item.find('.amount').text());
-        showSelectedAmountDescription($_form, $swiper_first_item.data('payment-amount-option-id'));
+        setAmountInputValue($form, $swiper_first_item.find('.amount').text());
+        showSelectedAmountDescription($form, $swiper_first_item.data('payment-amount-option-id'));
 
     }
 
     function showSelectedAmountDescription($form, amount_option_id) {
 
-        $form.find('.section__fields.amount-description').css('display', 'none');
-
-        let $amount_option_description = $form.find(`.section__fields.amount-description span[data-payment-amount-option-id = "${amount_option_id}"]`);
+        $amount_option_description = $form.find(`.section__fields.amount-description span[data-payment-amount-option-id = "${amount_option_id}"]`);
 
         if(amount_option_id && $amount_option_description && $amount_option_description.text() !== '') {
 
@@ -2374,6 +2368,8 @@ jQuery(document).ready(function($){
 
             $amount_option_description.css('display', 'block');
 
+        } else {
+            $form.find('.section__fields.amount-description').css('display', 'none');
         }
 
     }
@@ -2391,8 +2387,12 @@ jQuery(document).ready(function($){
 			$this.addClass('active');
 
             setupPeriodicity($_form);
-            setupCurrencies($_form);
             setupSwiperWidth($_form);
+
+            // Equalize the PM selection blocks widths:
+            $_form.find('.payments-grid .equalize-elements-width').each(function(){
+                equalizeFormElementsWidth($(this));
+            });
 
             const amount_mode = $('.section--amount .section__fields.amount').data('amount-mode');
             const payment_type = $this.data('periodicity') === 'once' ? 'single' : 'recurring';
@@ -2404,104 +2404,17 @@ jQuery(document).ready(function($){
             }
 
         });
-
-        $('.leyka-tpl-star-form .section__fields.currencies').on('click.leyka', 'a', function(e){
-
-            e.preventDefault();
-
-            let $this = $(this),
-                $_form = $(this).closest('form.leyka-pm-form'),
-                currency = $(this).data('currency'),
-                $currency_tab = $_form.find(`.currency-tab.currency-${currency}`);
-
-            $this.closest('.section__fields').find('a').removeClass('active');
-            $this.addClass('active');
-
-            $_form.find('.currency-tab').addClass('leyka-hidden');
-            $currency_tab.removeClass('leyka-hidden').show();
-            setupSwiperWidth($currency_tab);
-
-            if(currency !== 'crypto') {
-                $_form.find('.section--person').removeClass('leyka-hidden');
-            } else {
-                $_form.find('.section--person').addClass('leyka-hidden');
-            }
-
-            const amount_mode = $('.section--amount .section__fields.amount').data('amount-mode');
-            const payment_type = $('.section__fields.periodicity a.active').data('periodicity') === 'once' ?
-                'single' : 'recurring';
-
-            if(amount_mode === 'flexible') {
-                setAmountInputValue($_form, $('.flex-amount-item input').val());
-            } else {
-                showAmountOptionsByPaymentType($_form, payment_type);
-            }
-
-            $currency_tab.find('.payments-grid .swiper-item.selected .payment-opt__button').click();
-
-        });
-
-        $('.leyka-tpl-star-form .currency-tab .leyka-button-copy').on('click.leyka', function(e){
-
-            const $btn = $(this);
-
-            $btn.css('pointer-events', 'none');
-
-            const $tmp = $("<textarea>");
-
-            $('body').append($tmp);
-
-            $tmp.val($btn.parent('.leyka-cryptocurrency-data-wrapper').find('.leyka-cryptocurrency-link').text())
-                .select();
-
-            document.execCommand('copy');
-
-            $tmp.remove();
-
-            const $btn_img = $btn.find('img'),
-                $btn_span = $btn.find('span'),
-                $wallet_link = $btn.parents('.leyka-cryptocurrency-data-wrapper').find('.leyka-cryptocurrency-link');
-
-            $btn_img.addClass('leyka-hidden');
-
-            $wallet_link.css('opacity', 0.3);
-
-            $btn_span
-                .animate({ marginRight: '0'}, 200)
-                .delay(1200)
-                .animate({ marginRight: '-135px'}, 200, function(){
-
-                    $btn_img.removeClass('leyka-hidden');
-                    $btn.css('pointer-events', 'all');
-                    $wallet_link.css('opacity', 1);
-
-                });
-
-        });
-
+        
         $('.leyka-tpl-star-form form.leyka-pm-form').each(function(){
-
             setupPeriodicity($(this));
-            setupCurrencies($(this));
             setupSwiperWidth($(this));
-
-            const $_form = $(this).closest('form.leyka-pm-form');
-            const amount_mode = $('.section--amount .section__fields.amount').data('amount-mode');
-            const payment_type = $('.section__fields.periodicity a.active').data('periodicity') === 'once' ? 'single' : 'recurring';
-
-            if(amount_mode === 'flexible') {
-                setAmountInputValue($_form, $('.flex-amount-item input').val());
-            } else {
-                showAmountOptionsByPaymentType($_form, payment_type);
-            }
-
         });
     }
 
     function setupSwiperWidth($_form) {
 
         // Amount swiper setup:
-        $_form.find('.amount__figure.star-swiper .swiper-list .swiper-item').last().css('margin-right', '0px');
+        $('.amount__figure.star-swiper .swiper-list .swiper-item').last().css('margin-right', '0px');
 
         // PM swiper setup:
         let $swiper = $_form.find('.payments-grid .star-swiper'),
@@ -2525,16 +2438,9 @@ jQuery(document).ready(function($){
 
         if($swiper.find('.full-list').length) {
 
-            max_width = $_form.width() > 502 ? (max_width - 60) / 2 : max_width - 60;
+            max_width -= 60;
             $swiper.find('.payment-opt__label').css('max-width', max_width);
             $swiper.find('.payment-opt__icon').css('max-width', max_width);
-
-            if($_form.width() < 220) {
-
-                $swiper.find('.payment-opt').css('flex-basis', $_form.width());
-                $_form.find('.donor-field').css('flex-basis', $_form.width());
-
-            }
 
         } else {
 
@@ -2563,33 +2469,9 @@ jQuery(document).ready(function($){
             }
 
         }
-
+        
         toggleSwiperArrows($swiper);
         swipeList($swiper, $active_item);
-
-        setupSinglePMBlock($_form);
-
-    }
-
-    function setupSinglePMBlock($_form) {
-
-        $_form = $_form.hasClass('currency-tab') ? $_form.parents('form.leyka-pm-form') : $_form;
-
-        let $available_pm_blocks = $_form.find('.currency-tab:visible').find('.payments-grid .swiper-item:not(.disabled)'),
-            $single_pm_icon_block = $_form.find('.single-pm-icon'),
-            $pm_form_section = $_form.find('.currency-tab:visible').find('.section--cards');
-
-        if($available_pm_blocks.length === 1) {
-
-            $single_pm_icon_block.html($available_pm_blocks.find('.payment-opt__icon').html()).show();
-            $pm_form_section.hide();
-
-        } else {
-
-            $single_pm_icon_block.hide();
-            $pm_form_section.show();
-
-        }
 
     }
 
@@ -2629,42 +2511,30 @@ jQuery(document).ready(function($){
             $_form.find('.section__fields.periodicity a[data-periodicity="once"]').addClass('active');
             $_form.find('input.is-recurring-chosen').val('0').trigger('change');
             $_form.find('.payments-grid .swiper-item').each(function(i, element){
-
                 if($(element).find('input[data-has-recurring="0"]').length > 0) {
                     $(element).removeClass('disabled');
                 }
-
             });
 
         }
 
-        setupSinglePMBlock($_form);
-        checkFormFillCompletion($_form);
+        let $available_pm_blocks = $_form.find('.payments-grid .swiper-item:not(.disabled)'),
+            $single_pm_icon_block = $_form.find('.single-pm-icon'),
+            $pm_form_section = $_form.find('.section--cards');
 
-    }
+        if($available_pm_blocks.length === 1) {
 
-    function setupCurrencies($form) {
+            $single_pm_icon_block.html($available_pm_blocks.find('.payment-opt__icon').html()).show();
+            $pm_form_section.hide();
 
-        const $section_currencies = $form.find('.section.section--currencies'),
-            periodicity = $form.find('.section__fields.periodicity a.active').data('periodicity'),
-            main_currency = $section_currencies.data('main-currency'),
-            currencies_count = parseInt($section_currencies.data('currencies-count'), 10),
-            is_crypto_enabled = $section_currencies.data('is-crypto-enabled');
-
-        if(currencies_count > 1 || is_crypto_enabled == 1) {
-            $section_currencies.removeClass('leyka-hidden');
-        }
-
-        if(periodicity === 'once') {
-            $section_currencies.find('a[data-currency="crypto"]').removeClass('leyka-hidden');
         } else {
-            $section_currencies.find('a[data-currency="crypto"]').addClass('leyka-hidden');
-        }
 
-        $form.find('.section__fields.currencies a').removeClass('active');
-        $form.find('.currency-tab').addClass('leyka-hidden');
-        $form.find(`.section__fields.currencies a[data-currency="${main_currency}"]`).addClass('active');
-        $form.find(`.currency-tab.currency-${main_currency}`).removeClass('leyka-hidden');
+            $single_pm_icon_block.hide();
+            $pm_form_section.show();
+
+        }
+        
+        checkFormFillCompletion($_form);
 
     }
 
@@ -2702,13 +2572,11 @@ jQuery(document).ready(function($){
                 $submit.val( $submit.data('submit-text-template').replace('#DAILY_ROUBLE_AMOUNT#', monthly_amount_formatted) );
 
                 // Move the "daily rouble" comment arrow to the selected amount block:
-                let style = document.createElement('style');
-                style.innerHTML = '.amount__figure.star-swiper .daily-rouble-comment:before {left: '+comment_arrow_offset+'px !important;}';
-                document.head.appendChild(style);
+                document.styleSheets[0].addRule('.amount__figure.star-swiper .daily-rouble-comment:before', 'left: '+comment_arrow_offset+'px !important;');
 
             }
 
-            if($this.parents('.section--amount').length > 0) {
+            if ($this.parents('.section--amount').length > 0) {
                 showSelectedAmountDescription($form, $this.data('payment-amount-option-id'));
             }
 
@@ -2728,18 +2596,9 @@ jQuery(document).ready(function($){
 
         });
 
-        const currency = $('.section__fields.currencies a.active').data('currency'),
-            $currency_tab = $(`.currency-tab.currency-${currency}`),
-            payment_type = $('.section__fields.periodicity a.active').data('periodicity') === 'once' ? 'single' : 'recurring',
-            $swiper_amount_first_item = $currency_tab
-                .find(`.section--amount .swiper-item[data-payment-type="${payment_type}"]`)
-                    .first(),
-            $swiper_cards_first_item = $currency_tab.find(`.section--cards .swiper-item`).first();
+        $('.leyka-tpl-star-form .star-swiper .swiper-item:first').click();
 
-        $swiper_amount_first_item.click();
-        $swiper_cards_first_item.click();
-
-        $currency_tab.find('.star-swiper .swiper-item.selected')
+        $('.leyka-tpl-star-form .star-swiper .swiper-item.selected')
             .find('input[type="radio"]')
                 .prop('checked', true)
                 .change();
@@ -2748,43 +2607,37 @@ jQuery(document).ready(function($){
 
             e.preventDefault();
 
-			let $this = $(this),
+			var $this = $(this),
                 $swiper = $this.closest('.star-swiper'),
                 $activeItem = $swiper.find('.swiper-item.selected:not(.disabled)'),
                 $nextItem = null;
 
 			if($this.hasClass('swipe-right')) {
-				$nextItem = $activeItem.nextAll('.swiper-item:not(.disabled)').first();
+				$nextItem = $activeItem.next('.swiper-item:not(.disabled)');
 			} else {
-				$nextItem = $activeItem.prevAll('.swiper-item:not(.disabled)').first();
+				$nextItem = $activeItem.prev('.swiper-item:not(.disabled)');
 			}
 
 			if( !$nextItem.length ) {
-
 				if($this.hasClass('swipe-right')) {
 					$nextItem = $swiper.find('.swiper-item:not(.disabled)').first();
 				} else {
 					$nextItem = $swiper.find('.swiper-item:not(.disabled)').last();
 				}
-
 			}
 
 			if($nextItem.length) {
-
 				$activeItem.removeClass('selected');
 				$nextItem.addClass('selected');
                 $nextItem.find('input[type="radio"]').prop('checked', true).change();
-
 			}
 
             swipeList($swiper, $nextItem);
             toggleSwiperArrows($swiper);
 
             if($nextItem.hasClass('flex-amount-item')) {
-
                 $nextItem.find('input[type=number]').focus();
                 $nextItem.addClass('focus').removeClass('empty');
-
             }
 
             if($swiper.hasClass('amount__figure')) {
@@ -2825,6 +2678,7 @@ jQuery(document).ready(function($){
             left = -dif;
         } else {
             left = $swiper.width() / 2 - ($activeItem.offset().left - $list.offset().left) - $activeItem.width() / 2;
+            // console.log(parseInt($activeItem.css('margin-right')))
             left -= parseInt($activeItem.css('margin-right')) * 1.5; //24; // minus margin * 1.5
         }
         
@@ -2985,12 +2839,8 @@ jQuery(document).ready(function($){
         $('.leyka-tpl-star-form').on('submit.leyka', 'form.leyka-pm-form', function(e){
 
             var $form = $(this),
-                $currency_tab = $form.find('.currency-tab:not(.leyka-hidden)'),
                 $errors = $form.parents('.leyka-payment-form').siblings('.leyka-submit-errors'),
-                $pm_selected = $form.find('input[name="leyka_payment_method"]:checked'),
-                currency = $('.section__fields.currencies a.active').data('currency');
-
-            $form.find(`.currency-tab:not(.currency-${currency})`).remove();
+                $pm_selected = $form.find('input[name="leyka_payment_method"]:checked');
 
 			e.preventDefault();
 
@@ -3133,14 +2983,16 @@ jQuery(document).ready(function($){
 
                 }
 
+                // Equalize the Donor info fields widths:
+                $_form.find('.section--person .equalize-elements-width').each(function(){
+                    equalizeFormElementsWidth($(this));
+                });
+
             });
 
         });
 
-        const currency = $('.section__fields.currencies a.active').data('currency'),
-            $currency_tab = $(`.currency-tab.currency-${currency}`);
-
-        $currency_tab.find('.payments-grid .swiper-item.selected').each(function(i, el){
+        $('.leyka-tpl-star-form .payments-grid .swiper-item.selected').each(function(i, el){
             $(this).click();
         });
 
